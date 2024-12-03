@@ -2,6 +2,7 @@ export interface WeatherData {
   timestamp: number;
   temperature: number;
   windSpeed: number;
+  windGusts: number;
   windDirection: number;
   humidity: number;
 }
@@ -11,7 +12,9 @@ export interface PredictionChunk {
   endTime: number;
   temperature: number;
   windSpeed: number;
+  windGusts: number;
   windDirection: number;
+  humidity: number;
   confidence: number;
 }
 

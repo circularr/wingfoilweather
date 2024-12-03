@@ -30,10 +30,19 @@ export const WeatherPredictor: React.FC = () => {
         setProgress(status);
       });
       
-      const newPredictions = await model.predict(weatherData.slice(-16));
+      // Use the last 24 hours of data for better predictions
+      const lastDayData = weatherData.slice(-24);
+      const newPredictions = await model.predict(lastDayData);
+      
+      // Ensure we have hourly predictions for the next 24 hours
+      if (newPredictions.length < 24) {
+        console.warn('Not enough predictions generated:', newPredictions.length);
+      }
+      
       setPredictions(newPredictions);
       model.dispose();
     } catch (err) {
+      console.error('Prediction error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsTraining(false);
@@ -54,21 +63,23 @@ export const WeatherPredictor: React.FC = () => {
       )}
 
       {isTraining && (
-        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
-          Training model... {progress && `Epoch ${progress.epoch + 1}, Loss: ${progress.loss.toFixed(4)}`}
+        <div className="mb-4">
+          <div className="animate-pulse bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+            Training model... {progress?.epoch && `Epoch ${progress.epoch}`}
+          </div>
         </div>
       )}
 
-      {predictions.length > 0 && (
+      {location && !isTraining && !error && (
         <>
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
               <h2 className="text-2xl font-bold mb-4">Raw Wind Speed</h2>
               <PredictionChart 
-                data={rawData.slice(-16)} 
+                data={rawData.slice(-24)} 
                 dataKey="windSpeed" 
-                color="#60A5FA"
-                unit=" knots"
+                color="#2563EB"
+                unit="kts"
               />
             </div>
             <div>
@@ -76,8 +87,8 @@ export const WeatherPredictor: React.FC = () => {
               <PredictionChart 
                 data={predictions} 
                 dataKey="windSpeed" 
-                color="#34D399"
-                unit=" knots"
+                color="#7C3AED"
+                unit="kts"
               />
             </div>
           </div>
@@ -86,7 +97,7 @@ export const WeatherPredictor: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold mb-4">Raw Wind Direction</h2>
               <PredictionChart 
-                data={rawData.slice(-16)} 
+                data={rawData.slice(-24)} 
                 dataKey="windDirection" 
                 color="#F59E0B"
                 unit="°"

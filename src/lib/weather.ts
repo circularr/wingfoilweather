@@ -8,7 +8,7 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
     const response = await fetch(
       `https://api.open-meteo.com/v1/forecast?` +
       `latitude=${lat}&longitude=${lon}&` +
-      `hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&` +
+      `hourly=temperature_2m,relative_humidity_2m,windspeed_10m,winddirection_10m,windgusts_10m&` +
       `past_hours=${hours}&forecast_hours=24&` +
       `timezone=auto`
     );
@@ -30,8 +30,9 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
     const weatherData = data.hourly.time.map((timestamp: string, i: number) => ({
       timestamp: new Date(timestamp).getTime(),
       temperature: data.hourly.temperature_2m[i],
-      windSpeed: data.hourly.wind_speed_10m[i] * msToKnots, // Convert to knots
-      windDirection: data.hourly.wind_direction_10m[i],
+      windSpeed: data.hourly.windspeed_10m[i] * msToKnots, // Sustained wind speed
+      windGusts: data.hourly.windgusts_10m[i] * msToKnots, // Gust speed
+      windDirection: data.hourly.winddirection_10m[i],
       humidity: data.hourly.relative_humidity_2m[i]
     }));
 

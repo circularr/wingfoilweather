@@ -1,93 +1,136 @@
 import React from 'react';
-import { PredictionChunk, WeatherData } from '../WeatherPredictor/types';
+import type { WeatherData, PredictionChunk } from '../WeatherPredictor/types';
+import './styles.css';
 
 interface WindTableProps {
-  predictions: PredictionChunk[];
   rawData: WeatherData[];
+  predictions: PredictionChunk[];
 }
 
-export const WindTable: React.FC<WindTableProps> = ({ predictions, rawData }) => {
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
+const formatDate = (timestamp: number) => {
+  try {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     });
-  };
+  } catch (e) {
+    console.error('Error formatting date:', e);
+    return 'Invalid Date';
+  }
+};
 
-  const formatWindDirection = (degrees: number) => {
-    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-    const index = Math.round(((degrees + 360) % 360) / 22.5) % 16;
-    return `${directions[index]} (${Math.round(degrees)}°)`;
-  };
+const formatNumber = (value: number | undefined, decimals: number = 1): string => {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '-';
+  }
+  return value.toFixed(decimals);
+};
 
-  // Get the latest 4 raw data points (last hour)
-  const latestRawData = rawData.slice(-4);
+export const WindTable: React.FC<WindTableProps> = ({ rawData = [], predictions = [] }) => {
+  // Debug logging
+  console.log('WindTable received predictions:', predictions.length, 'predictions');
+
+  if (!Array.isArray(rawData) || !Array.isArray(predictions)) {
+    console.error('Invalid data type:', { rawData, predictions });
+    return <div>No data available</div>;
+  }
+
+  if (rawData.length === 0) {
+    return <div>No weather data available</div>;
+  }
+
+  // Get the current timestamp
+  const now = Date.now();
+
+  // Filter and sort raw data to show only future data
+  const futureRawData = rawData
+    .filter(data => data.timestamp >= now)
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  // Sort predictions by timestamp
+  const sortedPredictions = [...predictions].sort((a, b) => a.startTime - b.startTime);
+
+  // Create a map of raw data timestamps for lookup
+  const rawDataTimestamps = new Set(futureRawData.map(d => d.timestamp));
+
+  // Create a combined array of all future timestamps
+  const allTimestamps = new Set([
+    ...futureRawData.map(d => d.timestamp),
+    ...sortedPredictions.map(p => p.startTime)
+  ]);
+
+  // Convert to array and sort
+  const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
+
+  // Create lookup maps
+  const rawDataMap = new Map(futureRawData.map(d => [d.timestamp, d]));
+  const predictionMap = new Map(sortedPredictions.map(p => [p.startTime, p]));
 
   return (
-    <div className="overflow-x-auto">
-      <div className="grid grid-cols-2 gap-8">
-        {/* Raw Data Table */}
-        <div>
-          <h3 className="text-xl font-semibold mb-4">Raw OpenMeteo Data</h3>
-          <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-lg">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-2 text-left">Time</th>
-                <th className="px-4 py-2 text-left">Wind Speed (knots)</th>
-                <th className="px-4 py-2 text-left">Wind Direction</th>
-              </tr>
-            </thead>
-            <tbody>
-              {latestRawData.map((data, index) => (
-                <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                  <td className="px-4 py-2">
-                    {formatTime(data.timestamp)}
-                  </td>
-                  <td className="px-4 py-2">
-                    {Math.round(data.windSpeed)}
-                  </td>
-                  <td className="px-4 py-2">
-                    {formatWindDirection(data.windDirection)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+    <div className="wind-table-container">
+      <h3>Hourly Wind Data Comparison</h3>
+      <div className="table-scroll">
+        <table className="wind-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th colSpan={4}>Raw Data</th>
+              <th colSpan={4}>AI Prediction</th>
+            </tr>
+            <tr>
+              <th></th>
+              <th>Wind Speed (kts)</th>
+              <th>Gusts (kts)</th>
+              <th>Direction</th>
+              <th>Temp (°C)</th>
+              <th>Wind Speed (kts)</th>
+              <th>Gusts (kts)</th>
+              <th>Direction</th>
+              <th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedTimestamps.map((timestamp, index) => {
+              const rawData = rawDataMap.get(timestamp);
+              const prediction = predictionMap.get(timestamp);
 
-        {/* Predictions Table */}
-        <div>
-          <h3 className="text-xl font-semibold mb-4">AI Predictions</h3>
-          <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-lg">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-2 text-left">Time Range</th>
-                <th className="px-4 py-2 text-left">Wind Speed (knots)</th>
-                <th className="px-4 py-2 text-left">Wind Direction</th>
-                <th className="px-4 py-2 text-left">Confidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {predictions.map((chunk, index) => (
-                <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                  <td className="px-4 py-2">
-                    {formatTime(chunk.startTime)} - {formatTime(chunk.endTime)}
-                  </td>
-                  <td className="px-4 py-2">
-                    {Math.round(chunk.windSpeed)}
-                  </td>
-                  <td className="px-4 py-2">
-                    {formatWindDirection(chunk.windDirection)}
-                  </td>
-                  <td className="px-4 py-2">
-                    {Math.round(chunk.confidence * 100)}%
-                  </td>
+              return (
+                <tr key={index} className={prediction ? 'has-prediction' : ''}>
+                  <td>{formatDate(timestamp)}</td>
+                  {rawData ? (
+                    <>
+                      <td>{formatNumber(rawData.windSpeed)}</td>
+                      <td>{formatNumber(rawData.windGusts)}</td>
+                      <td>{formatNumber(rawData.windDirection, 0)}°</td>
+                      <td>{formatNumber(rawData.temperature)}</td>
+                    </>
+                  ) : (
+                    <td colSpan={4}>No raw data</td>
+                  )}
+                  {prediction ? (
+                    <>
+                      <td>{formatNumber(prediction.windSpeed)}</td>
+                      <td>{formatNumber(prediction.windGusts)}</td>
+                      <td>{formatNumber(prediction.windDirection, 0)}°</td>
+                      <td>{formatNumber(prediction.confidence ? prediction.confidence * 100 : undefined, 0)}%</td>
+                    </>
+                  ) : (
+                    <td colSpan={4}>No prediction</td>
+                  )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-sm text-gray-600 mt-2">
+        Showing {sortedTimestamps.length} hours of data • 
+        {predictions.length} predictions • 
+        {futureRawData.length} raw data points
       </div>
     </div>
   );
