@@ -1,150 +1,157 @@
-import React from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import type { PredictionChunk, WeatherData } from '../WeatherPredictor/types';
+import React, { useEffect, useRef } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  LineController
+} from 'chart.js';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  LineController,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface ChartProps {
-  historicalData: WeatherData[];
-  predictions: PredictionChunk[];
-  dataKey: 'temperature' | 'windSpeed' | 'windDirection';
-  color: string;
-  unit: string;
+  data: Array<{
+    timestamp: number;
+    forecast?: number;
+    prediction?: number;
+  }>;
+  yLabel: string;
+  forecastLabel: string;
+  predictionLabel: string;
+  id: string;
 }
 
-interface CombinedDataPoint {
-  timestamp: number;
-  actual: number | undefined;
-  predicted: number | undefined;
-}
+export function Chart({ data, yLabel, forecastLabel, predictionLabel, id }: ChartProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<ChartJS | null>(null);
 
-export function PredictionChart({ historicalData, predictions, dataKey, color, unit }: ChartProps) {
-  const formatTime = (timestamp: number) => {
-    if (!timestamp || isNaN(timestamp)) return '';
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-GB', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-  };
+  useEffect(() => {
+    // Cleanup previous chart instance
+    if (chartRef.current) {
+      chartRef.current.destroy();
+      chartRef.current = null;
+    }
 
-  const formatTooltipTime = (timestamp: number) => {
-    if (!timestamp || isNaN(timestamp)) return '';
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-GB', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-  };
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  const formatValue = (value: number | undefined) => {
-    if (typeof value !== 'number' || isNaN(value)) return '0' + unit;
-    return Math.round(value) + unit;
-  };
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-  // Combine historical and prediction data
-  const combinedData: CombinedDataPoint[] = [...historicalData].map(data => ({
-    timestamp: data.timestamp,
-    actual: data[dataKey],
-    predicted: undefined
-  }));
-
-  // Add predictions
-  predictions.forEach(pred => {
-    const existingIndex = combinedData.findIndex(d => Math.abs(d.timestamp - pred.startTime) < 1800000);
-    if (existingIndex >= 0) {
-      combinedData[existingIndex].predicted = pred[dataKey];
-    } else {
-      combinedData.push({
-        timestamp: pred.startTime,
-        actual: undefined,
-        predicted: pred[dataKey]
+    const formatTime = (timestamp: number) => {
+      return new Date(timestamp).toLocaleString('en-GB', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
       });
-    }
-  });
+    };
 
-  // Sort by timestamp
-  combinedData.sort((a, b) => a.timestamp - b.timestamp);
+    // Transform undefined values to null for Chart.js
+    const forecastData = data.map(d => d.forecast ?? null);
+    const predictionData = data.map(d => d.prediction ?? null);
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
-          <p className="text-sm text-gray-600 mb-1">{formatTooltipTime(label)}</p>
-          {payload.map((entry: any, index: number) => (
-            entry.value !== undefined && (
-              <p key={index} className="text-sm font-semibold" style={{ color: entry.color }}>
-                {entry.name}: {formatValue(entry.value)}
-              </p>
-            )
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
+    // Create new chart instance
+    chartRef.current = new ChartJS(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map(d => formatTime(d.timestamp)),
+        datasets: [
+          {
+            label: forecastLabel,
+            data: forecastData,
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            borderWidth: 2,
+            pointRadius: 2,
+            tension: 0.4,
+            fill: false
+          },
+          {
+            label: predictionLabel,
+            data: predictionData,
+            borderColor: 'rgb(168, 85, 247)',
+            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+            borderWidth: 2,
+            pointRadius: 2,
+            tension: 0.4,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+          },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                if (items.length > 0) {
+                  const index = items[0].dataIndex;
+                  return formatTime(data[index].timestamp);
+                }
+                return '';
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            display: true,
+            title: {
+              display: true,
+              text: 'Time'
+            },
+            ticks: {
+              maxRotation: 45,
+              minRotation: 45
+            }
+          },
+          y: {
+            display: true,
+            title: {
+              display: true,
+              text: yLabel
+            }
+          }
+        }
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
+  }, [data, yLabel, forecastLabel, predictionLabel, id]);
 
   return (
-    <div className="w-full h-[300px] bg-white p-4 rounded-lg shadow">
-      <ResponsiveContainer>
-        <AreaChart data={combinedData}>
-          <defs>
-            <linearGradient id={`gradient-actual`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={color} stopOpacity={0.8}/>
-              <stop offset="95%" stopColor={color} stopOpacity={0.2}/>
-            </linearGradient>
-            <linearGradient id={`gradient-predicted`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#4299e1" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="#4299e1" stopOpacity={0.2}/>
-            </linearGradient>
-          </defs>
-          <XAxis
-            dataKey="timestamp"
-            tickFormatter={formatTime}
-            interval="preserveStartEnd"
-            minTickGap={60}
-            angle={-45}
-            textAnchor="end"
-            height={80}
-            tick={{ fontSize: 12 }}
-          />
-          <YAxis
-            tickFormatter={formatValue}
-            domain={dataKey === 'windDirection' ? [0, 360] : ['auto', 'auto']}
-            width={60}
-            tick={{ fontSize: 12 }}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend />
-          <Area
-            type="monotone"
-            dataKey="actual"
-            name={`Actual ${dataKey.charAt(0).toUpperCase() + dataKey.slice(1)} ${unit}`}
-            stroke={color}
-            fill={`url(#gradient-actual)`}
-            isAnimationActive={false}
-            strokeWidth={2}
-            connectNulls
-          />
-          <Area
-            type="monotone"
-            dataKey="predicted"
-            name={`Predicted ${dataKey.charAt(0).toUpperCase() + dataKey.slice(1)} ${unit}`}
-            stroke="#4299e1"
-            fill={`url(#gradient-predicted)`}
-            isAnimationActive={false}
-            strokeWidth={2}
-            strokeDasharray="5 5"
-            connectNulls
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+    <div style={{ height: '300px', width: '100%' }}>
+      <canvas ref={canvasRef} id={id}></canvas>
     </div>
   );
 }
