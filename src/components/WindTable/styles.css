@@ -1,0 +1,56 @@
+.wind-table-container {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.wind-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-background);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.wind-table th,
+.wind-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wind-table th {
+  background-color: var(--background-color);
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.wind-table tr:last-child td {
+  border-bottom: none;
+}
+
+.wind-table tr:hover {
+  background-color: var(--background-color);
+}
+
+.wind-direction {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wind-arrow {
+  display: inline-block;
+  transform-origin: center;
+}
+
+.confidence-high {
+  color: #34a853;
+}
+
+.confidence-medium {
+  color: #fbbc05;
+}
+
+.confidence-low {
+  color: #ea4335;
+} 
