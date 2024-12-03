@@ -3,50 +3,89 @@ import type { WeatherData, PredictionChunk, ModelConfig } from './types';
 import { standardizeData } from '../../lib/tf-setup';
 
 const DEFAULT_CONFIG: ModelConfig = {
-  epochs: 20,
+  epochs: 50,          // Increased from 20 to 50 for better training
   batchSize: 32,
   learningRate: 0.001,
-  timeSteps: 16,
+  timeSteps: 24,       // Reduced to 24 hours (1 day of history)
   predictionSteps: 24  // 24 hours of predictions
 };
 
 export class WeatherPredictor {
   private model: tf.LayersModel | null = null;
   private config: ModelConfig;
-  private dataMean: number[] | null = null;
-  private dataStd: number[] | null = null;
+  private meanStd: { mean: number[]; std: number[] } | null = null;
 
   constructor(config: Partial<ModelConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  private normalize(data: number[][]): number[][] {
+    if (!this.meanStd) {
+      const features = data[0].length;
+      const mean = new Array(features).fill(0);
+      const std = new Array(features).fill(0);
+      
+      // Calculate mean
+      for (const row of data) {
+        for (let i = 0; i < features; i++) {
+          mean[i] += row[i];
+        }
+      }
+      for (let i = 0; i < features; i++) {
+        mean[i] /= data.length;
+      }
+      
+      // Calculate std with better numerical stability
+      for (const row of data) {
+        for (let i = 0; i < features; i++) {
+          std[i] += Math.pow(row[i] - mean[i], 2);
+        }
+      }
+      for (let i = 0; i < features; i++) {
+        std[i] = Math.sqrt(std[i] / data.length) + 1e-6; // Small epsilon to prevent division by zero
+      }
+      
+      this.meanStd = { mean, std };
+    }
+    
+    return data.map(row => 
+      row.map((val, i) => (val - this.meanStd!.mean[i]) / this.meanStd!.std[i])
+    );
+  }
+
+  private denormalize(data: number[][], featureIndices: number[]): number[][] {
+    if (!this.meanStd) return data;
+    
+    return data.map(row => 
+      row.map((val, i) => val * this.meanStd!.std[featureIndices[i]] + this.meanStd!.mean[featureIndices[i]])
+    );
   }
 
   private createModel(): tf.LayersModel {
     return tf.tidy(() => {
       const model = tf.sequential();
 
-      // Enhanced model architecture
-      model.add(tf.layers.dense({
-        units: 128,
-        inputShape: [this.config.timeSteps * 5],
-        activation: 'relu'
-      }));
-
-      model.add(tf.layers.batchNormalization());
+      // Larger input layer for increased historical data
       model.add(tf.layers.dense({
         units: 256,
-        activation: 'relu'
-      }));
-      model.add(tf.layers.dropout({ rate: 0.3 }));
-
-      model.add(tf.layers.dense({
-        units: 128,
+        inputShape: [this.config.timeSteps * 5],
         activation: 'relu'
       }));
       model.add(tf.layers.dropout({ rate: 0.2 }));
 
-      // Output layer for hourly predictions
+      // Additional hidden layers
+      model.add(tf.layers.dense({ units: 512, activation: 'relu' }));
+      model.add(tf.layers.dropout({ rate: 0.3 }));
+      
+      model.add(tf.layers.dense({ units: 256, activation: 'relu' }));
+      model.add(tf.layers.dropout({ rate: 0.2 }));
+      
+      model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
+      model.add(tf.layers.dropout({ rate: 0.1 }));
+
+      // Output layer
       model.add(tf.layers.dense({
-        units: 5, // One hour prediction at a time
+        units: 3,
         activation: 'linear'
       }));
 
@@ -59,155 +98,66 @@ export class WeatherPredictor {
     });
   }
 
-  async predict(recentData: WeatherData[]): Promise<PredictionChunk[]> {
-    if (!this.model) {
-      throw new Error('Model not trained');
-    }
-
-    return tf.tidy(() => {
-      const predictions: PredictionChunk[] = [];
-      let currentData = [...recentData.slice(-this.config.timeSteps)];
-      const hourMs = 3600000;
-      const lastTimestamp = currentData[currentData.length - 1].timestamp;
-
-      // Generate predictions one hour at a time
-      for (let hour = 0; hour < this.config.predictionSteps; hour++) {
-        // Prepare input for current prediction
-        const input = currentData.map(d => [
-          d.temperature,
-          d.windSpeed,
-          d.windGusts,
-          d.windDirection,
-          d.humidity
-        ]);
-
-        const inputTensor = tf.tensor2d(input);
-        const normalized = this.normalizeData(inputTensor);
-        const reshaped = normalized.reshape([1, this.config.timeSteps * 5]);
-        const prediction = this.model!.predict(reshaped) as tf.Tensor;
-        const denormalized = this.denormalizeData(prediction.reshape([-1, 5]));
-        
-        const predictionValues = denormalized.arraySync() as number[][];
-        const values = predictionValues[0];
-
-        // Create prediction chunk for this hour
-        const chunk: PredictionChunk = {
-          startTime: lastTimestamp + (hour * hourMs),
-          endTime: lastTimestamp + ((hour + 1) * hourMs),
-          temperature: values[0],
-          windSpeed: Math.max(0, values[1]),
-          windGusts: Math.max(values[1], values[2]),
-          windDirection: ((values[3] % 360) + 360) % 360,
-          humidity: Math.min(100, Math.max(0, values[4])),
-          confidence: Math.max(0, 1 - (hour * 0.04)) // Confidence decreases over time
-        };
-
-        predictions.push(chunk);
-
-        // Update currentData for next prediction by removing oldest and adding new prediction
-        currentData.shift();
-        currentData.push({
-          timestamp: chunk.startTime,
-          temperature: chunk.temperature,
-          windSpeed: chunk.windSpeed,
-          windGusts: chunk.windGusts,
-          windDirection: chunk.windDirection,
-          humidity: chunk.humidity
-        });
-      }
-
-      return predictions;
-    });
-  }
-
-  private normalizeData(data: tf.Tensor2D): tf.Tensor2D {
-    return tf.tidy(() => {
-      if (!this.dataMean || !this.dataStd) {
-        this.dataMean = data.mean(0).arraySync() as number[];
-        this.dataStd = data.sub(tf.tensor2d([this.dataMean]))
-          .square()
-          .mean(0)
-          .sqrt()
-          .arraySync() as number[];
-      }
-      
-      return data.sub(tf.tensor2d([this.dataMean]))
-        .div(tf.tensor2d([this.dataStd]));
-    });
-  }
-
-  private denormalizeData(data: tf.Tensor2D): tf.Tensor2D {
-    return tf.tidy(() => {
-      if (!this.dataMean || !this.dataStd) {
-        throw new Error('Data statistics not initialized');
-      }
-      return data.mul(tf.tensor2d([this.dataStd]))
-        .add(tf.tensor2d([this.dataMean]));
-    });
-  }
-
-  private prepareData(weatherData: WeatherData[]): {
-    features: tf.Tensor2D;
-    labels: tf.Tensor2D;
-  } {
-    return tf.tidy(() => {
-      const data = weatherData.map(d => [
-        d.temperature,
-        d.windSpeed,
-        d.windGusts,
-        d.windDirection,
-        d.humidity
-      ]);
-
-      const tensor = tf.tensor2d(data);
-      const normalized = this.normalizeData(tensor);
-
-      const sequences = [];
-      const labels = [];
-      
-      for (let i = 0; i <= data.length - this.config.timeSteps - 1; i++) {
-        const sequence = normalized
-          .slice([i, 0], [this.config.timeSteps, 5])
-          .reshape([1, this.config.timeSteps * 5]);
-        
-        const label = normalized
-          .slice([i + this.config.timeSteps, 0], [1, 5])
-          .reshape([1, 5]);
-
-        sequences.push(sequence);
-        labels.push(label);
-      }
-
-      return {
-        features: tf.concat(sequences, 0),
-        labels: tf.concat(labels, 0)
-      };
-    });
-  }
-
   async train(weatherData: WeatherData[], onProgress?: (status: { epoch: number; loss: number }) => void): Promise<void> {
     if (weatherData.length < this.config.timeSteps + 1) {
       throw new Error(`Insufficient data: need at least ${this.config.timeSteps + 1} points`);
     }
 
     try {
-      this.model = this.createModel();
-      const { features, labels } = this.prepareData(weatherData);
+      // Sort data by timestamp to ensure chronological order
+      const sortedData = [...weatherData].sort((a, b) => a.timestamp - b.timestamp);
 
-      await this.model.fit(features, labels, {
+      // Convert data to arrays for normalization
+      const rawData = sortedData.map(d => [
+        d.temperature,
+        d.windSpeed,
+        d.windGusts,
+        d.windDirection / 360, // Normalize direction to [0, 1]
+        d.humidity || 0
+      ]);
+
+      // Normalize the data
+      const normalizedData = this.normalize(rawData);
+
+      // Prepare sequences and labels with sliding window
+      const sequences: number[][] = [];
+      const labels: number[][] = [];
+
+      // Use more data for training by sliding the window
+      for (let i = 0; i <= normalizedData.length - this.config.timeSteps - 1; i++) {
+        const sequence = normalizedData.slice(i, i + this.config.timeSteps).flat();
+        const nextValues = normalizedData[i + this.config.timeSteps];
+        
+        sequences.push(sequence);
+        labels.push([nextValues[1], nextValues[2], nextValues[3]]); // wind speed, gusts, direction
+      }
+
+      // Create tensors
+      const features = tf.tensor2d(sequences);
+      const targets = tf.tensor2d(labels);
+
+      // Create and train model with more epochs and validation
+      this.model = this.createModel();
+      await this.model.fit(features, targets, {
         epochs: this.config.epochs,
         batchSize: this.config.batchSize,
         shuffle: true,
         validationSplit: 0.2,
         callbacks: {
           onEpochEnd: (epoch, logs) => {
-            onProgress?.({
-              epoch,
-              loss: logs?.loss ?? 0
-            });
+            if (onProgress) {
+              onProgress({
+                epoch,
+                loss: logs?.loss || 0
+              });
+            }
           }
         }
       });
+
+      // Cleanup
+      features.dispose();
+      targets.dispose();
 
     } catch (error) {
       console.error('Training error:', error);
@@ -215,7 +165,86 @@ export class WeatherPredictor {
     }
   }
 
+  async predict(inputData: WeatherData[]): Promise<PredictionChunk[]> {
+    if (!this.model) {
+      throw new Error('Model not trained');
+    }
+
+    try {
+      const predictions: PredictionChunk[] = [];
+      let currentInput = [...inputData];
+
+      // Get current hour timestamp
+      const now = new Date();
+      now.setMinutes(0, 0, 0);
+      const currentHourTimestamp = now.getTime();
+
+      // Prepare initial input
+      const initialRawData = currentInput.map(d => [
+        d.temperature,
+        d.windSpeed,
+        d.windGusts,
+        d.windDirection / 360,
+        d.humidity || 0
+      ]);
+
+      let normalizedInput = this.normalize(initialRawData);
+
+      // Generate predictions for 24 hours
+      for (let hour = 0; hour < 24; hour++) {
+        const timestamp = currentHourTimestamp + (hour * 3600000);
+        
+        // Prepare input tensor
+        const inputSequence = normalizedInput.slice(-this.config.timeSteps).flat();
+        const inputTensor = tf.tensor2d([inputSequence]);
+        
+        // Make prediction
+        const outputTensor = this.model.predict(inputTensor) as tf.Tensor;
+        const normalizedPrediction = await outputTensor.array() as number[][];
+        
+        // Denormalize prediction
+        const denormalizedPrediction = this.denormalize(normalizedPrediction, [1, 2, 3])[0];
+        
+        // Calculate confidence
+        const confidence = Math.max(0.08, 1 - (hour * 0.04));
+        
+        // Create prediction chunk
+        const prediction: PredictionChunk = {
+          startTime: timestamp,
+          windSpeed: Math.max(0, denormalizedPrediction[0]),
+          windGusts: Math.max(0, denormalizedPrediction[1]),
+          windDirection: ((Math.round(denormalizedPrediction[2] * 360) % 360) + 360) % 360,
+          confidence
+        };
+        
+        predictions.push(prediction);
+        
+        // Update input for next prediction
+        const newDataPoint = [
+          normalizedInput[normalizedInput.length - 1][0], // Keep last temperature
+          normalizedPrediction[0][0],
+          normalizedPrediction[0][1],
+          normalizedPrediction[0][2],
+          normalizedInput[normalizedInput.length - 1][4]  // Keep last humidity
+        ];
+        
+        normalizedInput = [...normalizedInput.slice(1), newDataPoint];
+        
+        // Cleanup tensors
+        inputTensor.dispose();
+        outputTensor.dispose();
+      }
+
+      return predictions;
+    } catch (error) {
+      console.error('Prediction error:', error);
+      throw error;
+    }
+  }
+
   dispose(): void {
     this.model?.dispose();
+    this.model = null;
+    this.meanStd = null;
   }
 }

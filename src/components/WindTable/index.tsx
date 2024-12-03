@@ -43,32 +43,37 @@ export const WindTable: React.FC<WindTableProps> = ({ rawData = [], predictions 
     return <div>No weather data available</div>;
   }
 
-  // Get the current timestamp
-  const now = Date.now();
+  // Get current hour timestamp (rounded down)
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+  const currentHourTimestamp = now.getTime();
 
-  // Filter and sort raw data to show only future data
-  const futureRawData = rawData
-    .filter(data => data.timestamp >= now)
-    .sort((a, b) => a.timestamp - b.timestamp);
+  // Sort all data by timestamp
+  const sortedRawData = [...rawData].sort((a, b) => a.timestamp - b.timestamp);
 
-  // Sort predictions by timestamp
-  const sortedPredictions = [...predictions].sort((a, b) => a.startTime - b.startTime);
+  // Get the last 24 hours of historical data (for training display)
+  const trainingData = sortedRawData.filter(
+    d => d.timestamp < currentHourTimestamp && 
+        d.timestamp >= currentHourTimestamp - 24 * 3600000
+  );
 
-  // Create a map of raw data timestamps for lookup
-  const rawDataTimestamps = new Set(futureRawData.map(d => d.timestamp));
+  // Get the next 24 hours of forecast data
+  const futureData = sortedRawData.filter(
+    d => d.timestamp >= currentHourTimestamp && 
+        d.timestamp < currentHourTimestamp + 24 * 3600000
+  );
 
-  // Create a combined array of all future timestamps
+  // Create a map for predictions
+  const predictionMap = new Map(predictions.map(p => [p.startTime, p]));
+
+  // Combine all timestamps we want to show (last 24h + next 24h)
   const allTimestamps = new Set([
-    ...futureRawData.map(d => d.timestamp),
-    ...sortedPredictions.map(p => p.startTime)
+    ...trainingData.map(d => d.timestamp),
+    ...futureData.map(d => d.timestamp),
+    ...predictions.map(p => p.startTime)
   ]);
 
-  // Convert to array and sort
   const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
-
-  // Create lookup maps
-  const rawDataMap = new Map(futureRawData.map(d => [d.timestamp, d]));
-  const predictionMap = new Map(sortedPredictions.map(p => [p.startTime, p]));
 
   return (
     <div className="wind-table-container">
@@ -95,18 +100,25 @@ export const WindTable: React.FC<WindTableProps> = ({ rawData = [], predictions 
           </thead>
           <tbody>
             {sortedTimestamps.map((timestamp, index) => {
-              const rawData = rawDataMap.get(timestamp);
+              const rawDataPoint = sortedRawData.find(d => d.timestamp === timestamp);
               const prediction = predictionMap.get(timestamp);
+              const isTrainingData = timestamp < currentHourTimestamp;
+              const isFutureData = timestamp >= currentHourTimestamp;
 
               return (
-                <tr key={index} className={prediction ? 'has-prediction' : ''}>
+                <tr key={index} 
+                    className={`
+                      ${isTrainingData ? 'training-data' : ''}
+                      ${isFutureData ? 'future-data' : ''}
+                      ${prediction ? 'has-prediction' : ''}
+                    `}>
                   <td>{formatDate(timestamp)}</td>
-                  {rawData ? (
+                  {rawDataPoint ? (
                     <>
-                      <td>{formatNumber(rawData.windSpeed)}</td>
-                      <td>{formatNumber(rawData.windGusts)}</td>
-                      <td>{formatNumber(rawData.windDirection, 0)}°</td>
-                      <td>{formatNumber(rawData.temperature)}</td>
+                      <td>{formatNumber(rawDataPoint.windSpeed)}</td>
+                      <td>{formatNumber(rawDataPoint.windGusts)}</td>
+                      <td>{formatNumber(rawDataPoint.windDirection, 0)}°</td>
+                      <td>{formatNumber(rawDataPoint.temperature)}</td>
                     </>
                   ) : (
                     <td colSpan={4}>No raw data</td>
@@ -128,9 +140,9 @@ export const WindTable: React.FC<WindTableProps> = ({ rawData = [], predictions 
         </table>
       </div>
       <div className="text-sm text-gray-600 mt-2">
-        Showing {sortedTimestamps.length} hours of data • 
-        {predictions.length} predictions • 
-        {futureRawData.length} raw data points
+        Training data: {trainingData.length} hours • 
+        Future data: {futureData.length} hours • 
+        Predictions: {predictions.length} hours
       </div>
     </div>
   );

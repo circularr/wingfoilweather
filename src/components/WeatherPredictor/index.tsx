@@ -23,23 +23,39 @@ export const WeatherPredictor: React.FC = () => {
     try {
       setIsTraining(true);
       const weatherData = await fetchHistoricalWeather(lat, lon);
+      
+      // Get current hour timestamp (rounded down)
+      const now = new Date();
+      now.setMinutes(0, 0, 0);
+      const currentHourTimestamp = now.getTime();
+      
+      // Split data into past and future at current hour
+      const historicalData = weatherData.filter(d => d.timestamp < currentHourTimestamp);
+      const futureData = weatherData.filter(d => d.timestamp >= currentHourTimestamp);
+      
+      // Keep all data for display
       setRawData(weatherData);
       
       const model = new Model();
-      await model.train(weatherData, (status) => {
+      
+      // Train on all available historical data
+      await model.train(historicalData, (status) => {
         setProgress(status);
       });
       
-      // Use the last 24 hours of data for better predictions
-      const lastDayData = weatherData.slice(-24);
-      const newPredictions = await model.predict(lastDayData);
+      // Use the last 24 hours for prediction input
+      const predictionInput = historicalData.slice(-24);
       
-      // Ensure we have hourly predictions for the next 24 hours
-      if (newPredictions.length < 24) {
-        console.warn('Not enough predictions generated:', newPredictions.length);
-      }
+      // Generate predictions starting from current hour
+      const newPredictions = await model.predict(predictionInput);
       
-      setPredictions(newPredictions);
+      // Align predictions with current time
+      const alignedPredictions = newPredictions.map((pred, index) => ({
+        ...pred,
+        startTime: currentHourTimestamp + (index * 3600000) // Add hours in milliseconds
+      })).slice(0, 24); // Ensure exactly 24 hours of predictions
+      
+      setPredictions(alignedPredictions);
       model.dispose();
     } catch (err) {
       console.error('Prediction error:', err);
