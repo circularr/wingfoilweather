@@ -1,237 +1,155 @@
 import * as tf from '@tensorflow/tfjs';
 import type { WeatherData, PredictionChunk, ModelConfig } from './types';
-import { standardizeData } from '../../lib/tf-setup';
 
-const DEFAULT_CONFIG: ModelConfig = {
-  epochs: 50,          // Increased from 20 to 50 for better training
-  batchSize: 32,
-  learningRate: 0.001,
-  timeSteps: 24,       // Reduced to 24 hours (1 day of history)
-  predictionSteps: 24  // 24 hours of predictions
-};
-
-export class WeatherPredictor {
+export class WeatherModel {
   private model: tf.LayersModel | null = null;
-  private config: ModelConfig;
-  private meanStd: { mean: number[]; std: number[] } | null = null;
+  private config: ModelConfig = {
+    epochs: 50,
+    batchSize: 32,
+    learningRate: 0.001,
+    timeSteps: 16,  // 16 hours of input data
+    predictionSteps: 24  // Predict 24 hours ahead
+  };
 
-  constructor(config: Partial<ModelConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+  private featureCount = 6;  // [temp, windSpeed, windGusts, windDirSin, windDirCos, humidity]
+
+  async initialize() {
+    const model = tf.sequential();
+      
+    // LSTM layer for processing temporal sequences
+    model.add(tf.layers.lstm({
+      units: 128,
+      inputShape: [this.config.timeSteps, this.featureCount],
+      returnSequences: false
+    }));
+    model.add(tf.layers.dropout({ rate: 0.2 }));
+
+    // Dense layers for multi-step prediction
+    model.add(tf.layers.dense({
+      units: 64,
+      activation: 'relu'
+    }));
+    model.add(tf.layers.dropout({ rate: 0.2 }));
+
+    // Output layer predicts multiple steps ahead
+    model.add(tf.layers.dense({
+      units: this.config.predictionSteps * 5,  // [temp, windSpeed, windGusts, windDirSin, windDirCos]
+      activation: 'linear'
+    }));
+
+    model.compile({
+      optimizer: tf.train.adam(this.config.learningRate),
+      loss: 'meanSquaredError',
+      metrics: ['mse']
+    });
+
+    this.model = model;
+    console.log('Model initialized with architecture:', model.summary());
   }
 
-  private prepareData(data: WeatherData[]): {
-    inputs: number[][],
-    labels: number[][],
-    normalizer: { mean: number[], std: number[] }
-  } {
-    // Convert wind direction to sine and cosine components
-    const processedData = data.map(d => [
+  private preprocessData(data: WeatherData[]): number[][] {
+    return data.map(d => [
       d.temperature,
       d.windSpeed,
       d.windGusts,
-      Math.sin(d.windDirection * Math.PI / 180), // sin component
-      Math.cos(d.windDirection * Math.PI / 180), // cos component
-      d.humidity || 0
+      Math.sin(d.windDirection * Math.PI / 180),  // Convert direction to sine
+      Math.cos(d.windDirection * Math.PI / 180),  // Convert direction to cosine
+      d.humidity
     ]);
-    
-    // Calculate mean and standard deviation for normalization
-    const mean = processedData[0].map((_, col) => 
-      processedData.reduce((sum, row) => sum + row[col], 0) / processedData.length
-    );
-    
-    const std = processedData[0].map((_, col) => {
-      const avg = mean[col];
-      const squareDiffs = processedData.map(row => Math.pow(row[col] - avg, 2));
-      return Math.sqrt(squareDiffs.reduce((sum, val) => sum + val, 0) / processedData.length);
-    });
-    
-    // Normalize the data
-    const normalizedData = processedData.map(row =>
-      row.map((val, i) => (val - mean[i]) / (std[i] || 1))
-    );
-    
-    const inputs: number[][] = [];
-    const labels: number[][] = [];
-    
-    // Prepare sequences for training
-    for (let i = 0; i < normalizedData.length - this.config.timeSteps - this.config.predictionSteps + 1; i++) {
-      const sequence = normalizedData.slice(i, i + this.config.timeSteps);
-      inputs.push(sequence.flat());
+  }
+
+  private createSequences(data: number[][]): [tf.Tensor, tf.Tensor] {
+    const sequences: number[][][] = [];
+    const targets: number[][] = [];
+
+    for (let i = 0; i < data.length - this.config.timeSteps - this.config.predictionSteps; i++) {
+      sequences.push(data.slice(i, i + this.config.timeSteps));
       
-      // Get multiple steps ahead for labels
-      const futureSteps = normalizedData
-        .slice(i + this.config.timeSteps, i + this.config.timeSteps + this.config.predictionSteps)
-        .map(step => [step[1], step[2], Math.atan2(step[3], step[4]) * 180 / Math.PI])
+      // Create target sequence for multiple steps ahead
+      const target = data.slice(i + this.config.timeSteps, i + this.config.timeSteps + this.config.predictionSteps)
+        .map(step => [
+          step[0],  // temperature
+          step[1],  // windSpeed
+          step[2],  // windGusts
+          step[3],  // windDirSin
+          step[4]   // windDirCos
+        ])
         .flat();
-      
-      labels.push(futureSteps);
+      targets.push(target);
     }
-    
-    return { inputs, labels, normalizer: { mean, std } };
+
+    return [
+      tf.tensor3d(sequences),
+      tf.tensor2d(targets)
+    ];
   }
 
-  private createModel(): tf.LayersModel {
-    return tf.tidy(() => {
-      const model = tf.sequential();
-      
-      // LSTM layer for processing temporal sequences
-      model.add(tf.layers.lstm({
-        units: 128,
-        inputShape: [this.config.timeSteps, 6], // [timesteps, features]
-        returnSequences: false
-      }));
-      model.add(tf.layers.dropout({ rate: 0.2 }));
-      
-      // Dense layer for final predictions
-      model.add(tf.layers.dense({
-        units: 3 * this.config.predictionSteps, // Predict multiple steps ahead
-        activation: 'linear'
-      }));
-      
-      model.compile({
-        optimizer: tf.train.adam(this.config.learningRate),
-        loss: 'meanSquaredError'
-      });
-      
-      return model;
-    });
-  }
+  async train(data: WeatherData[]) {
+    if (!this.model) throw new Error('Model not initialized');
 
-  async train(weatherData: WeatherData[], onProgress?: (status: { epoch: number; loss: number }) => void): Promise<void> {
-    if (weatherData.length < this.config.timeSteps + 1) {
-      throw new Error(`Insufficient data: need at least ${this.config.timeSteps + 1} points`);
-    }
+    const processedData = this.preprocessData(data);
+    const [inputs, targets] = this.createSequences(processedData);
 
     try {
-      // Sort data by timestamp to ensure chronological order
-      const sortedData = [...weatherData].sort((a, b) => a.timestamp - b.timestamp);
-
-      // Prepare data for training
-      const { inputs, labels, normalizer } = this.prepareData(sortedData);
-
-      // Create tensors
-      const features = tf.tensor2d(inputs);
-      const targets = tf.tensor2d(labels);
-
-      // Create and train model with more epochs and validation
-      this.model = this.createModel();
-      await this.model.fit(features, targets, {
+      const history = await this.model.fit(inputs, targets, {
         epochs: this.config.epochs,
         batchSize: this.config.batchSize,
-        shuffle: true,
         validationSplit: 0.2,
+        shuffle: true,
         callbacks: {
           onEpochEnd: (epoch, logs) => {
-            if (onProgress) {
-              onProgress({
-                epoch,
-                loss: logs?.loss || 0
-              });
-            }
+            console.log(
+              `Epoch ${epoch + 1}/${this.config.epochs} - ` +
+              `loss: ${logs?.loss.toFixed(4)} - ` +
+              `val_loss: ${logs?.val_loss.toFixed(4)}`
+            );
           }
         }
       });
 
-      // Store normalizer for later use
-      this.meanStd = normalizer;
-
-      // Cleanup
-      features.dispose();
+      console.log('Training complete:', history);
+    } finally {
+      inputs.dispose();
       targets.dispose();
-
-    } catch (error) {
-      console.error('Training error:', error);
-      throw error;
     }
   }
 
-  async predict(inputData: WeatherData[]): Promise<PredictionChunk[]> {
-    if (!this.model) {
-      throw new Error('Model not trained');
-    }
+  async predict(recentData: WeatherData[]): Promise<PredictionChunk[]> {
+    if (!this.model) throw new Error('Model not initialized');
+
+    const processedData = this.preprocessData(recentData);
+    const input = tf.tensor3d([processedData.slice(-this.config.timeSteps)]);
 
     try {
+      const prediction = await this.model.predict(input) as tf.Tensor2D;
+      const predictionArray = await prediction.array() as number[][];
+      const lastTimestamp = recentData[recentData.length - 1].timestamp;
+
+      // Convert flat predictions back to time steps
       const predictions: PredictionChunk[] = [];
-      let currentInput = [...inputData];
-
-      // Get current hour timestamp
-      const now = new Date();
-      now.setMinutes(0, 0, 0);
-      const currentHourTimestamp = now.getTime();
-
-      // Prepare initial input
-      const initialRawData = currentInput.map(d => [
-        d.temperature,
-        d.windSpeed,
-        d.windGusts,
-        Math.sin(d.windDirection * Math.PI / 180), // sin component
-        Math.cos(d.windDirection * Math.PI / 180), // cos component
-        d.humidity || 0
-      ]);
-
-      // Normalize input data
-      const normalizedInput = initialRawData.map(row =>
-        row.map((val, i) => (val - this.meanStd!.mean[i]) / (this.meanStd!.std[i] || 1))
-      );
-
-      // Generate predictions for 24 hours
-      for (let hour = 0; hour < 24; hour++) {
-        const timestamp = currentHourTimestamp + (hour * 3600000);
+      for (let i = 0; i < this.config.predictionSteps; i++) {
+        const offset = i * 5;  // 5 features per step
+        const windDirSin = predictionArray[0][offset + 3];
+        const windDirCos = predictionArray[0][offset + 4];
         
-        // Prepare input tensor
-        const inputSequence = normalizedInput.slice(-this.config.timeSteps).flat();
-        const inputTensor = tf.tensor2d([inputSequence]);
+        // Convert sine and cosine back to degrees
+        const windDirection = ((Math.atan2(windDirSin, windDirCos) * 180 / Math.PI) + 360) % 360;
         
-        // Make prediction
-        const outputTensor = this.model.predict(inputTensor) as tf.Tensor;
-        const normalizedPrediction = await outputTensor.array() as number[][];
-        
-        // Denormalize prediction
-        const denormalizedPrediction = normalizedPrediction[0].map((val, i) => 
-          val * (this.meanStd!.std[Math.floor(i / 3)] || 1) + this.meanStd!.mean[Math.floor(i / 3)]
-        );
-        
-        // Calculate confidence
-        const confidence = Math.max(0.08, 1 - (hour * 0.04));
-        
-        // Create prediction chunk
-        const prediction: PredictionChunk = {
-          startTime: timestamp,
-          windSpeed: Math.max(0, denormalizedPrediction[0]),
-          windGusts: Math.max(0, denormalizedPrediction[1]),
-          windDirection: ((Math.round(Math.atan2(denormalizedPrediction[2], denormalizedPrediction[3]) * 180 / Math.PI) % 360) + 360) % 360,
-          confidence
-        };
-        
-        predictions.push(prediction);
-        
-        // Update input for next prediction
-        const newDataPoint = [
-          normalizedInput[normalizedInput.length - 1][0], // Keep last temperature
-          denormalizedPrediction[0],
-          denormalizedPrediction[1],
-          denormalizedPrediction[2],
-          denormalizedPrediction[3],
-          normalizedInput[normalizedInput.length - 1][5]  // Keep last humidity
-        ];
-        
-        normalizedInput = [...normalizedInput.slice(1), newDataPoint];
-        
-        // Cleanup tensors
-        inputTensor.dispose();
-        outputTensor.dispose();
+        predictions.push({
+          startTime: lastTimestamp + (i + 1) * 60 * 60 * 1000,
+          endTime: lastTimestamp + (i + 2) * 60 * 60 * 1000,
+          temperature: predictionArray[0][offset],
+          windSpeed: Math.max(0, predictionArray[0][offset + 1]),
+          windGusts: Math.max(0, predictionArray[0][offset + 2]),
+          windDirection,
+          humidity: recentData[recentData.length - 1].humidity,  // Use last known humidity
+          confidence: Math.max(0.2, 1 - (i * 0.03))  // Confidence decreases over time
+        });
       }
 
       return predictions;
-    } catch (error) {
-      console.error('Prediction error:', error);
-      throw error;
+    } finally {
+      input.dispose();
     }
-  }
-
-  dispose(): void {
-    this.model?.dispose();
-    this.model = null;
-    this.meanStd = null;
   }
 }

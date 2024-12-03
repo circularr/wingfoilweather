@@ -5,37 +5,24 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.table-scroll {
-  overflow-x: auto;
-  max-height: 600px;
-  overflow-y: auto;
-}
-
 .wind-table {
   width: 100%;
   border-collapse: collapse;
   text-align: center;
   font-size: 0.9rem;
+  background-color: white;
 }
 
 .wind-table th,
 .wind-table td {
-  padding: 0.5rem;
+  padding: 0.75rem;
   border: 1px solid #e2e8f0;
 }
 
-.wind-table thead {
-  background-color: #f8fafc;
-}
-
 .wind-table th {
+  background-color: #f8fafc;
   font-weight: 600;
-}
-
-.wind-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  color: #1a202c;
 }
 
 .wind-table tbody tr:nth-child(even) {
@@ -46,44 +33,68 @@
   background-color: #f0f0f0;
 }
 
-/* Data type styling */
-.wind-table tr.training-data {
-  background-color: #f0f9ff; /* Light blue for training data */
+.section-header {
+  padding: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  background-color: #edf2f7;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.wind-table tr.future-data {
-  background-color: #fff7ed; /* Light orange for future data */
+.training-data-header {
+  background-color: #ebf8ff;
+  color: #2c5282;
 }
 
-.wind-table tr.has-prediction.future-data {
-  background-color: #f0fdf4; /* Light green for predictions */
+.prediction-header {
+  background-color: #f0fff4;
+  color: #276749;
 }
 
-.has-prediction {
+.wind-direction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.wind-arrow {
+  display: inline-block;
+  font-size: 1.2em;
+  transition: transform 0.2s ease;
+}
+
+.confidence-high {
+  color: #2f855a;
+  font-weight: 600;
+}
+
+.confidence-medium {
+  color: #d69e2e;
+  font-weight: 600;
+}
+
+.confidence-low {
+  color: #c53030;
+  font-weight: 600;
+}
+
+.historical-row td {
+  color: #4a5568;
+}
+
+.prediction-row td {
+  color: #2d3748;
   font-weight: 500;
 }
 
-/* Status text */
-.text-sm {
-  font-size: 0.875rem;
-}
-
-.text-gray-600 {
-  color: #4b5563;
-}
-
-.mt-2 {
-  margin-top: 0.5rem;
-}
-
-/* Responsive design */
 @media (max-width: 768px) {
   .wind-table {
-    font-size: 12px;
+    font-size: 0.8rem;
   }
   
   .wind-table th,
   .wind-table td {
-    padding: 6px 8px;
+    padding: 0.5rem;
   }
 }
