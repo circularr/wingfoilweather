@@ -4,48 +4,73 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
   console.log('Fetching weather data for:', { lat, lon, hours });
   
   try {
-    // Calculate start and end dates
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - (hours * 60 * 60 * 1000));
+    // Calculate dates within allowed range
+    const now = new Date();
+    const startDate = new Date(now.getTime() - (hours * 60 * 60 * 1000));
     
     // Format dates as YYYY-MM-DD
     const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+    const endDateStr = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000)) // 2 days ahead max
+      .toISOString().split('T')[0];
+    
+    console.log('Requesting data for date range:', { startDateStr, endDateStr });
     
     // Get both past data and forecast
-    const response = await fetch(
-      `https://api.open-meteo.com/v1/forecast?` +
+    const url = `https://api.open-meteo.com/v1/forecast?` +
       `latitude=${lat}&longitude=${lon}&` +
       `hourly=temperature_2m,relative_humidity_2m,windspeed_10m,winddirection_10m,windgusts_10m&` +
-      `start_date=${startDateStr}&end_date=${endDateStr}&` +
-      `timezone=auto&windspeed_unit=kn`
-    );
+      `past_days=${Math.ceil(hours/24)}&` + // Include past days
+      `forecast_days=2&` + // 2 days of forecast
+      `timezone=auto&windspeed_unit=kn`;
+
+    console.log('Fetching from URL:', url);
+    
+    const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error(`Weather API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API Error Response:', errorText);
+      throw new Error(`Weather API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    
+    // Validate data structure
+    if (!data.hourly?.time?.length) {
+      console.error('Invalid data structure received:', data);
+      throw new Error('Invalid weather data format - missing hourly data');
+    }
+
     console.log('Received weather data:', {
       requestedLocation: { lat, lon },
       receivedLocation: { lat: data.latitude, lon: data.longitude },
       timeRange: { start: startDateStr, end: endDateStr },
-      dataPoints: data.hourly?.time?.length || 0
+      dataPoints: data.hourly.time.length,
+      sampleData: {
+        firstTimestamp: data.hourly.time[0],
+        lastTimestamp: data.hourly.time[data.hourly.time.length - 1]
+      }
     });
 
-    if (!data.hourly || !Array.isArray(data.hourly.time)) {
-      throw new Error('Invalid weather data format');
-    }
-
     // Data is already in knots due to windspeed_unit=kn parameter
-    const weatherData = data.hourly.time.map((timestamp: string, i: number) => ({
-      timestamp: new Date(timestamp).getTime(),
-      temperature: data.hourly.temperature_2m[i],
-      windSpeed: data.hourly.windspeed_10m[i],
-      windGusts: data.hourly.windgusts_10m[i],
-      windDirection: data.hourly.winddirection_10m[i],
-      humidity: data.hourly.relative_humidity_2m[i]
-    }));
+    const weatherData = data.hourly.time.map((timestamp: string, i: number) => {
+      const entry = {
+        timestamp: new Date(timestamp).getTime(),
+        temperature: data.hourly.temperature_2m[i],
+        windSpeed: data.hourly.windspeed_10m[i],
+        windGusts: data.hourly.windgusts_10m[i],
+        windDirection: data.hourly.winddirection_10m[i],
+        humidity: data.hourly.relative_humidity_2m[i],
+        isForecast: new Date(timestamp).getTime() > now.getTime() // Add flag for forecast data
+      };
+
+      // Validate each entry
+      if (Object.values(entry).some(v => v === undefined || v === null || isNaN(v))) {
+        console.warn('Invalid entry found:', { timestamp, entry });
+      }
+
+      return entry;
+    });
 
     // Filter out any invalid entries
     const validData = weatherData.filter(d => 
@@ -56,12 +81,38 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
       d.windDirection <= 360
     );
 
-    console.log('Processed weather data:', validData.length, 'valid records');
+    const stats = {
+      total: validData.length,
+      historical: validData.filter(d => !d.isForecast).length,
+      forecast: validData.filter(d => d.isForecast).length,
+      timeRange: {
+        start: format(Math.min(...validData.map(d => d.timestamp)), 'yyyy-MM-dd HH:mm'),
+        end: format(Math.max(...validData.map(d => d.timestamp)), 'yyyy-MM-dd HH:mm')
+      }
+    };
+
+    console.log('Processed weather data:', stats);
+    
+    if (stats.total === 0) {
+      throw new Error('No valid weather data found after processing');
+    }
+    
     return validData;
   } catch (error) {
     console.error('Error fetching weather data:', error);
     throw error;
   }
+}
+
+// Helper function to format dates
+function format(timestamp: number, pattern: string): string {
+  const date = new Date(timestamp);
+  return pattern
+    .replace('yyyy', date.getFullYear().toString())
+    .replace('MM', (date.getMonth() + 1).toString().padStart(2, '0'))
+    .replace('dd', date.getDate().toString().padStart(2, '0'))
+    .replace('HH', date.getHours().toString().padStart(2, '0'))
+    .replace('mm', date.getMinutes().toString().padStart(2, '0'));
 }
 
 export function calculateWindQuality(windSpeed: number): {

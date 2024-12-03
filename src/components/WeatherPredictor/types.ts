@@ -5,6 +5,7 @@ export interface WeatherData {
   windGusts: number;
   windDirection: number;
   humidity: number;
+  isForecast?: boolean;
 }
 
 export interface PredictionChunk {

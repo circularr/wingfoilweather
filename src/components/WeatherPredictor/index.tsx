@@ -1,132 +1,104 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { WeatherModel } from './model';
+import React, { useState, useEffect } from 'react';
 import { Map } from '../Map';
 import { WindTable } from '../WindTable';
-import { PredictionChart } from '../Chart';
 import { fetchHistoricalWeather } from '../../lib/weather';
+import { trainModel, predictNextHours } from './model';
 import type { WeatherData, PredictionChunk } from './types';
 
 export function WeatherPredictor() {
-  const [location, setLocation] = useState<{ lat: number; lon: number; } | undefined>();
-  const [rawData, setRawData] = useState<WeatherData[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lon: number; } | null>(null);
+  const [historicalData, setHistoricalData] = useState<WeatherData[]>([]);
+  const [forecastData, setForecastData] = useState<WeatherData[]>([]);
   const [predictions, setPredictions] = useState<PredictionChunk[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLocationSelect = useCallback(async (lat: number, lon: number) => {
-    setLocation({ lat, lon });
-    setError(null);
-    setIsLoading(true);
+  useEffect(() => {
+    if (selectedLocation) {
+      setIsLoading(true);
+      setError(null);
+      setPredictions([]); // Clear previous predictions
 
-    try {
-      // Fetch historical data
-      const historicalData = await fetchHistoricalWeather(lat, lon);
-      setRawData(historicalData);
+      fetchHistoricalWeather(selectedLocation.lat, selectedLocation.lon)
+        .then(async (data) => {
+          // Split data into historical and forecast
+          const now = Date.now();
+          const historical = data.filter(d => d.timestamp <= now);
+          const forecast = data.filter(d => d.timestamp > now);
+          
+          // Sort both arrays chronologically
+          const sortedHistorical = [...historical].sort((a, b) => a.timestamp - b.timestamp);
+          const sortedForecast = [...forecast].sort((a, b) => a.timestamp - b.timestamp);
+          
+          console.log('Processed data:', {
+            total: data.length,
+            historical: sortedHistorical.length,
+            forecast: sortedForecast.length,
+            timeRange: {
+              start: new Date(sortedHistorical[0].timestamp).toISOString(),
+              end: new Date(sortedForecast[sortedForecast.length - 1].timestamp).toISOString()
+            }
+          });
 
-      // Initialize and train model
-      const model = new WeatherModel();
-      await model.initialize();
-      await model.train(historicalData);
+          setHistoricalData(sortedHistorical);
+          setForecastData(sortedForecast);
+          
+          try {
+            // Train model and generate predictions using only historical data
+            const model = await trainModel(sortedHistorical);
+            const nextHours = await predictNextHours(model, sortedHistorical);
+            
+            console.log('Generated predictions:', {
+              count: nextHours.length,
+              sample: nextHours[0],
+              timeRange: {
+                start: new Date(nextHours[0].startTime).toISOString(),
+                end: new Date(nextHours[nextHours.length - 1].startTime).toISOString()
+              }
+            });
 
-      // Make predictions
-      const newPredictions = await model.predict(historicalData.slice(-16));
-      setPredictions(newPredictions);
-
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
+            setPredictions(nextHours);
+          } catch (err) {
+            console.error('Prediction error:', err);
+            setError(err instanceof Error ? err.message : 'Unknown error during prediction');
+          }
+        })
+        .catch(err => {
+          console.error('Data fetch error:', err);
+          setError(err instanceof Error ? err.message : 'Unknown error fetching data');
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
-  }, []);
+  }, [selectedLocation]);
 
-  // Convert WeatherData to PredictionChunk format for charts
-  const convertToPredictionChunks = (data: WeatherData[]): PredictionChunk[] => {
-    return data.map(d => ({
-      startTime: d.timestamp,
-      endTime: d.timestamp + 3600000, // 1 hour
-      temperature: d.temperature,
-      windSpeed: d.windSpeed,
-      windGusts: d.windGusts,
-      windDirection: d.windDirection,
-      humidity: d.humidity,
-      confidence: 1.0 // Historical data has full confidence
-    }));
+  const handleLocationSelect = (lat: number, lon: number) => {
+    setSelectedLocation({ lat, lon });
   };
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Select Location</h2>
-        <Map onLocationSelect={handleLocationSelect} selectedLocation={location} />
-      </div>
-
+      <Map onLocationSelect={handleLocationSelect} selectedLocation={selectedLocation} />
+      
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-8">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
         </div>
       )}
 
-      {isLoading ? (
+      {isLoading && (
         <div className="text-center py-8">
-          <p className="text-lg text-gray-600">Loading and analyzing weather data...</p>
+          <div className="text-lg text-gray-600">Loading and analyzing weather data...</div>
         </div>
-      ) : (
-        rawData.length > 0 && (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Raw Wind Speed</h2>
-              <PredictionChart 
-                data={convertToPredictionChunks(rawData.slice(-24))}
-                dataKey="windSpeed" 
-                color="#2563EB"
-                unit="kts"
-              />
-            </div>
+      )}
 
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Raw Wind Direction</h2>
-              <PredictionChart 
-                data={convertToPredictionChunks(rawData.slice(-24))}
-                dataKey="windDirection" 
-                color="#F59E0B"
-                unit="°"
-              />
-            </div>
-
-            {predictions.length > 0 && (
-              <>
-                <div>
-                  <h2 className="text-2xl font-bold mb-4">Predicted Wind Speed</h2>
-                  <PredictionChart 
-                    data={predictions}
-                    dataKey="windSpeed"
-                    color="#10B981"
-                    unit="kts"
-                  />
-                </div>
-
-                <div>
-                  <h2 className="text-2xl font-bold mb-4">Predicted Wind Direction</h2>
-                  <PredictionChart 
-                    data={predictions}
-                    dataKey="windDirection"
-                    color="#8B5CF6"
-                    unit="°"
-                  />
-                </div>
-
-                <div>
-                  <h2 className="text-2xl font-bold mb-4">Detailed Forecast</h2>
-                  <WindTable 
-                    historicalData={rawData.slice(-24)}
-                    predictions={predictions}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        )
+      {!isLoading && selectedLocation && historicalData.length > 0 && (
+        <WindTable 
+          historicalData={historicalData}
+          forecastData={forecastData}
+          predictions={predictions}
+        />
       )}
     </div>
   );

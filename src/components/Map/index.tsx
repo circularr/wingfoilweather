@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 
 interface MapProps {
   onLocationSelect: (lat: number, lon: number) => void;
-  selectedLocation?: { lat: number; lon: number };
+  selectedLocation?: { lat: number; lon: number; } | null;
 }
 
 export const Map: React.FC<MapProps> = ({ onLocationSelect, selectedLocation }) => {
@@ -35,6 +35,9 @@ export const Map: React.FC<MapProps> = ({ onLocationSelect, selectedLocation }) 
           .addTo(mapRef.current);
       }
       mapRef.current.setView([selectedLocation.lat, selectedLocation.lon]);
+    } else if (markerRef.current) {
+      markerRef.current.remove();
+      markerRef.current = null;
     }
 
     return () => {
@@ -43,7 +46,7 @@ export const Map: React.FC<MapProps> = ({ onLocationSelect, selectedLocation }) 
         mapRef.current = null;
       }
     };
-  }, [selectedLocation]);
+  }, [selectedLocation, onLocationSelect]);
 
   return (
     <div id="map" className="w-full h-[400px] rounded-lg shadow-lg mb-6" />

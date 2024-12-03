@@ -5,6 +5,13 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.table-scroll-container {
+  overflow-x: auto;
+  margin-bottom: 1rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
 .wind-table {
   width: 100%;
   border-collapse: collapse;
@@ -17,20 +24,20 @@
 .wind-table td {
   padding: 0.75rem;
   border: 1px solid #e2e8f0;
+  vertical-align: middle;
 }
 
 .wind-table th {
   background-color: #f8fafc;
   font-weight: 600;
   color: #1a202c;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
-.wind-table tbody tr:nth-child(even) {
+.wind-table tr:nth-child(even) {
   background-color: #f8f9fa;
-}
-
-.wind-table tbody tr:hover {
-  background-color: #f0f0f0;
 }
 
 .section-header {
@@ -39,53 +46,69 @@
   color: #2d3748;
   background-color: #edf2f7;
   border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
-.training-data-header {
-  background-color: #ebf8ff;
-  color: #2c5282;
+.timestamp-cell {
+  white-space: nowrap;
+  min-width: 120px;
+  background-color: #f8fafc;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  font-weight: 500;
 }
 
-.prediction-header {
+.data-type-cell {
+  white-space: nowrap;
+  background-color: #f8fafc;
+  position: sticky;
+  left: 120px;
+  z-index: 5;
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.historical-row {
+  background-color: #f7fafc;
+}
+
+.historical-row .data-type-cell {
+  color: #4299e1;
+}
+
+.forecast-row {
   background-color: #f0fff4;
-  color: #276749;
 }
 
-.wind-direction {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+.forecast-row .data-type-cell {
+  color: #48bb78;
 }
 
-.wind-arrow {
-  display: inline-block;
-  font-size: 1.2em;
-  transition: transform 0.2s ease;
+.no-data {
+  color: #a0aec0;
+  font-style: italic;
+  text-align: center;
 }
 
-.confidence-high {
-  color: #2f855a;
-  font-weight: 600;
-}
-
-.confidence-medium {
-  color: #d69e2e;
-  font-weight: 600;
-}
-
-.confidence-low {
-  color: #c53030;
-  font-weight: 600;
-}
-
-.historical-row td {
+.data-summary {
+  padding: 1rem;
+  background-color: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  font-size: 0.9rem;
   color: #4a5568;
 }
 
-.prediction-row td {
-  color: #2d3748;
-  font-weight: 500;
+.data-summary div {
+  padding: 0.5rem;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 @media (max-width: 768px) {
@@ -97,4 +120,18 @@
   .wind-table td {
     padding: 0.5rem;
   }
+  
+  .timestamp-cell {
+    min-width: 100px;
+  }
+  
+  .data-type-cell {
+    min-width: 80px;
+    left: 100px;
+  }
+  
+  .data-summary {
+    grid-template-columns: 1fr;
+  }
 }
+
