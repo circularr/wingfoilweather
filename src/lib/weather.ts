@@ -14,58 +14,89 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
       .toISOString().split('T')[0];
     
     console.log('Requesting data for date range:', { startDateStr, endDateStr });
-    
-    // Get both past data and forecast
-    const url = `https://api.open-meteo.com/v1/forecast?` +
+
+    // First, get weather data from regular API
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?` +
       `latitude=${lat}&longitude=${lon}&` +
       `hourly=temperature_2m,relative_humidity_2m,windspeed_10m,winddirection_10m,windgusts_10m&` +
-      `past_days=${Math.ceil(hours/24)}&` + // Include past days
-      `forecast_days=2&` + // 2 days of forecast
-      `timezone=auto&windspeed_unit=kn`;
+      `past_days=${Math.ceil(hours/24)}&` +
+      `forecast_days=2&` +
+      `timezone=auto`;
 
-    console.log('Fetching from URL:', url);
+    // Second, get marine data from marine API
+    const marineUrl = `https://marine-api.open-meteo.com/v1/marine?` +
+      `latitude=${lat}&longitude=${lon}&` +
+      `hourly=wave_height,wave_period,wave_direction&` +
+      `past_days=${Math.ceil(hours/24)}&` +
+      `forecast_days=2&` +
+      `timezone=auto`;
+
+    console.log('Fetching from URLs:', { weatherUrl, marineUrl });
     
-    const response = await fetch(url);
+    // Fetch both APIs in parallel
+    const [weatherResponse, marineResponse] = await Promise.all([
+      fetch(weatherUrl),
+      fetch(marineUrl)
+    ]);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error Response:', errorText);
-      throw new Error(`Weather API error: ${response.status} - ${errorText}`);
+    if (!weatherResponse.ok || !marineResponse.ok) {
+      const weatherText = await weatherResponse.text();
+      const marineText = await marineResponse.text();
+      console.error('API Error Response:', { weather: weatherText, marine: marineText });
+      throw new Error(`Weather API error: ${weatherResponse.status}/${marineResponse.status}`);
     }
 
-    const data = await response.json();
+    const [weatherData, marineData] = await Promise.all([
+      weatherResponse.json(),
+      marineResponse.json()
+    ]);
     
     // Validate data structure
-    if (!data.hourly?.time?.length) {
-      console.error('Invalid data structure received:', data);
+    if (!weatherData.hourly?.time?.length || !marineData.hourly?.time?.length) {
+      console.error('Invalid data structure received:', { weatherData, marineData });
       throw new Error('Invalid weather data format - missing hourly data');
     }
 
     console.log('Received weather data:', {
       requestedLocation: { lat, lon },
-      receivedLocation: { lat: data.latitude, lon: data.longitude },
+      receivedLocation: { 
+        weather: { lat: weatherData.latitude, lon: weatherData.longitude },
+        marine: { lat: marineData.latitude, lon: marineData.longitude }
+      },
       timeRange: { start: startDateStr, end: endDateStr },
-      dataPoints: data.hourly.time.length,
-      sampleData: {
-        firstTimestamp: data.hourly.time[0],
-        lastTimestamp: data.hourly.time[data.hourly.time.length - 1]
+      dataPoints: {
+        weather: weatherData.hourly.time.length,
+        marine: marineData.hourly.time.length
       }
     });
 
-    // Data is already in knots due to windspeed_unit=kn parameter
-    const weatherData = data.hourly.time.map((timestamp: string, i: number) => {
+    const combinedData = weatherData.hourly.time.map((timestamp: string, i: number) => {
+      const now = new Date().getTime();
+      const entryTime = new Date(timestamp).getTime();
+      
+      // Find matching marine data index
+      const marineIndex = marineData.hourly.time.findIndex(
+        (t: string) => new Date(t).getTime() === entryTime
+      );
+      
       const entry = {
-        timestamp: new Date(timestamp).getTime(),
-        temperature: data.hourly.temperature_2m[i],
-        windSpeed: data.hourly.windspeed_10m[i],
-        windGusts: data.hourly.windgusts_10m[i],
-        windDirection: data.hourly.winddirection_10m[i],
-        humidity: data.hourly.relative_humidity_2m[i],
-        isForecast: new Date(timestamp).getTime() > now.getTime() // Add flag for forecast data
+        timestamp: entryTime,
+        temperature: weatherData.hourly.temperature_2m[i],
+        windSpeed: weatherData.hourly.windspeed_10m[i],
+        windGusts: weatherData.hourly.windgusts_10m[i],
+        windDirection: weatherData.hourly.winddirection_10m[i],
+        humidity: weatherData.hourly.relative_humidity_2m[i],
+        waveHeight: marineIndex >= 0 ? marineData.hourly.wave_height[marineIndex] : undefined,
+        wavePeriod: marineIndex >= 0 ? marineData.hourly.wave_period[marineIndex] : undefined,
+        swellDirection: marineIndex >= 0 ? marineData.hourly.wave_direction[marineIndex] : undefined,
+        isForecast: entryTime > now
       };
 
       // Validate each entry
-      if (Object.values(entry).some(v => v === undefined || v === null || isNaN(v))) {
+      if (Object.values(entry).some(v => 
+        v !== undefined && v !== null && 
+        typeof v === 'number' && isNaN(v)
+      )) {
         console.warn('Invalid entry found:', { timestamp, entry });
       }
 
@@ -73,18 +104,23 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
     });
 
     // Filter out any invalid entries
-    const validData = weatherData.filter(d => 
+    const validData = combinedData.filter(d => 
       !isNaN(d.timestamp) && 
       !isNaN(d.windSpeed) && 
       !isNaN(d.windDirection) &&
       d.windDirection >= 0 && 
-      d.windDirection <= 360
+      d.windDirection <= 360 &&
+      (d.waveHeight === undefined || !isNaN(d.waveHeight)) &&
+      (d.wavePeriod === undefined || !isNaN(d.wavePeriod)) &&
+      (d.swellDirection === undefined || (!isNaN(d.swellDirection) && 
+        d.swellDirection >= 0 && d.swellDirection <= 360))
     );
 
     const stats = {
       total: validData.length,
       historical: validData.filter(d => !d.isForecast).length,
       forecast: validData.filter(d => d.isForecast).length,
+      withWaveData: validData.filter(d => d.waveHeight !== undefined).length,
       timeRange: {
         start: format(Math.min(...validData.map(d => d.timestamp)), 'yyyy-MM-dd HH:mm'),
         end: format(Math.max(...validData.map(d => d.timestamp)), 'yyyy-MM-dd HH:mm')

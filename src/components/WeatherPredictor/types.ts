@@ -5,6 +5,9 @@ export interface WeatherData {
   windGusts: number;
   windDirection: number;
   humidity: number;
+  waveHeight?: number;
+  wavePeriod?: number;
+  swellDirection?: number;
   isForecast?: boolean;
 }
 
@@ -16,6 +19,9 @@ export interface PredictionChunk {
   windGusts: number;
   windDirection: number;
   humidity: number;
+  waveHeight: number;
+  wavePeriod: number;
+  swellDirection: number;
   confidence: number;
 }
 
@@ -24,7 +30,7 @@ export interface ModelConfig {
   batchSize: number;
   learningRate: number;
   timeSteps: number; // 16 hours
-  predictionSteps: number; // 4 chunks of 4 hours
+  predictionSteps: number; // 24 chunks of 4 hours
 }
 
 export interface TrainingStatus {

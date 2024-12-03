@@ -22,11 +22,14 @@ export class WeatherModel {
       this.model.dispose();
     }
 
+    // Calculate input features: temp, windSpeed, windGusts, windDirSin, windDirCos, waveHeight, wavePeriod, swellDirSin, swellDirCos
+    const NUM_FEATURES = 9;
+
     this.model = tf.sequential({
       layers: [
         tf.layers.lstm({
           units: 64,
-          inputShape: [this.config.timeSteps, 5],
+          inputShape: [this.config.timeSteps, NUM_FEATURES],
           returnSequences: true
         }),
         tf.layers.dropout({ rate: 0.2 }),
@@ -36,7 +39,7 @@ export class WeatherModel {
         }),
         tf.layers.dropout({ rate: 0.2 }),
         tf.layers.dense({
-          units: this.config.predictionSteps * 5,
+          units: this.config.predictionSteps * NUM_FEATURES,
           activation: 'linear'
         })
       ]
@@ -118,7 +121,11 @@ export class WeatherModel {
         d.windSpeed,
         d.windGusts,
         Math.sin(d.windDirection * Math.PI / 180),
-        Math.cos(d.windDirection * Math.PI / 180)
+        Math.cos(d.windDirection * Math.PI / 180),
+        d.waveHeight ?? 0,
+        d.wavePeriod ?? 0,
+        Math.sin((d.swellDirection ?? 0) * Math.PI / 180),
+        Math.cos((d.swellDirection ?? 0) * Math.PI / 180)
       ]);
       
       const targetFeatures = target.flatMap(d => [
@@ -126,7 +133,11 @@ export class WeatherModel {
         d.windSpeed,
         d.windGusts,
         Math.sin(d.windDirection * Math.PI / 180),
-        Math.cos(d.windDirection * Math.PI / 180)
+        Math.cos(d.windDirection * Math.PI / 180),
+        d.waveHeight ?? 0,
+        d.wavePeriod ?? 0,
+        Math.sin((d.swellDirection ?? 0) * Math.PI / 180),
+        Math.cos((d.swellDirection ?? 0) * Math.PI / 180)
       ]);
 
       X.push(windowFeatures);
@@ -145,7 +156,11 @@ export class WeatherModel {
       d.windSpeed,
       d.windGusts,
       Math.sin(d.windDirection * Math.PI / 180),
-      Math.cos(d.windDirection * Math.PI / 180)
+      Math.cos(d.windDirection * Math.PI / 180),
+      d.waveHeight ?? 0,
+      d.wavePeriod ?? 0,
+      Math.sin((d.swellDirection ?? 0) * Math.PI / 180),
+      Math.cos((d.swellDirection ?? 0) * Math.PI / 180)
     ]);
     
     return tf.tensor3d([input]);
@@ -154,23 +169,30 @@ export class WeatherModel {
   private formatPredictions(flatPredictions: number[], lastTimestamp: number): PredictionChunk[] {
     const chunks: PredictionChunk[] = [];
     const HOUR_MS = 3600000;
+    const NUM_FEATURES = 9;
     
     // Generate exactly 24 hourly predictions
     for (let i = 0; i < 24; i++) {
-      const offset = i * 5;  // 5 features per prediction
+      const offset = i * NUM_FEATURES;  // 9 features per prediction
       const timestamp = lastTimestamp + (i + 1) * HOUR_MS;
+      
+      // Extract directional components
+      const windDirSin = flatPredictions[offset + 3];
+      const windDirCos = flatPredictions[offset + 4];
+      const swellDirSin = flatPredictions[offset + 7];
+      const swellDirCos = flatPredictions[offset + 8];
       
       chunks.push({
         startTime: timestamp,
         endTime: timestamp + HOUR_MS,
         temperature: flatPredictions[offset],
-        windSpeed: Math.max(0, flatPredictions[offset + 1]),  // Wind speed can't be negative
-        windGusts: Math.max(0, flatPredictions[offset + 2]),  // Gusts can't be negative
-        windDirection: (Math.atan2(
-          flatPredictions[offset + 3],
-          flatPredictions[offset + 4]
-        ) * 180 / Math.PI + 360) % 360,
+        windSpeed: Math.max(0, flatPredictions[offset + 1]),
+        windGusts: Math.max(0, flatPredictions[offset + 2]),
+        windDirection: (Math.atan2(windDirSin, windDirCos) * 180 / Math.PI + 360) % 360,
         humidity: 0, // Not predicted
+        waveHeight: Math.max(0, flatPredictions[offset + 5]),
+        wavePeriod: Math.max(0, flatPredictions[offset + 6]),
+        swellDirection: (Math.atan2(swellDirSin, swellDirCos) * 180 / Math.PI + 360) % 360,
         confidence: Math.max(0.2, 1 - (i * 0.03))  // Decreasing confidence over time
       });
     }

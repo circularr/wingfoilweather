@@ -99,6 +99,21 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
       timestamp: d.timestamp,
       forecast: d.forecast?.windDirection,
       prediction: d.prediction?.windDirection
+    })).filter(d => d.forecast !== undefined || d.prediction !== undefined),
+    waveHeight: allData.map(d => ({
+      timestamp: d.timestamp,
+      forecast: d.forecast?.waveHeight,
+      prediction: d.prediction?.waveHeight
+    })).filter(d => d.forecast !== undefined || d.prediction !== undefined),
+    wavePeriod: allData.map(d => ({
+      timestamp: d.timestamp,
+      forecast: d.forecast?.wavePeriod,
+      prediction: d.prediction?.wavePeriod
+    })).filter(d => d.forecast !== undefined || d.prediction !== undefined),
+    swellDirection: allData.map(d => ({
+      timestamp: d.timestamp,
+      forecast: d.forecast?.swellDirection,
+      prediction: d.prediction?.swellDirection
     })).filter(d => d.forecast !== undefined || d.prediction !== undefined)
   };
 
@@ -164,6 +179,36 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             id="wind-direction-chart"
           />
         </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Wave Height Comparison</h3>
+          <Chart 
+            data={chartData.waveHeight}
+            yLabel="Wave Height (m)"
+            forecastLabel="OpenMeteo Forecast"
+            predictionLabel="AI Prediction"
+            id="wave-height-chart"
+          />
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Wave Period Comparison</h3>
+          <Chart 
+            data={chartData.wavePeriod}
+            yLabel="Wave Period (s)"
+            forecastLabel="OpenMeteo Forecast"
+            predictionLabel="AI Prediction"
+            id="wave-period-chart"
+          />
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Swell Direction Comparison</h3>
+          <Chart 
+            data={chartData.swellDirection}
+            yLabel="Swell Direction (°)"
+            forecastLabel="OpenMeteo Forecast"
+            predictionLabel="AI Prediction"
+            id="swell-direction-chart"
+          />
+        </div>
       </div>
 
       <div className="overflow-x-auto border border-gray-200 rounded-lg shadow">
@@ -176,9 +221,21 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
                 <th className="px-4 py-2 border-b text-center" colSpan={3}>Wind Speed (m/s)</th>
                 <th className="px-4 py-2 border-b text-center" colSpan={3}>Wind Gusts (m/s)</th>
                 <th className="px-4 py-2 border-b text-center" colSpan={3}>Wind Direction (°)</th>
+                <th className="px-4 py-2 border-b text-center" colSpan={3}>Wave Height (m)</th>
+                <th className="px-4 py-2 border-b text-center" colSpan={3}>Wave Period (s)</th>
+                <th className="px-4 py-2 border-b text-center" colSpan={3}>Swell Direction (°)</th>
               </tr>
               <tr className="bg-gray-100 text-sm">
                 <th className="sticky left-0 z-20 bg-gray-100 px-4 py-1 border-b border-r"></th>
+                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
+                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
+                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
+                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
+                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
+                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
+                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
+                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
+                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
                 <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
                 <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
                 <th className="px-4 py-1 border-b bg-purple-50">AI</th>
@@ -245,6 +302,39 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
                     </td>
                     <td className={getCellStyle(row.prediction?.windDirection, 'prediction')}>
                       {row.prediction?.windDirection.toFixed(0) || '-'}°
+                    </td>
+
+                    {/* Wave Height */}
+                    <td className={getCellStyle(row.historical?.waveHeight, 'historical')}>
+                      {row.historical?.waveHeight?.toFixed(1) || '-'}
+                    </td>
+                    <td className={getCellStyle(row.forecast?.waveHeight, 'forecast')}>
+                      {row.forecast?.waveHeight?.toFixed(1) || '-'}
+                    </td>
+                    <td className={getCellStyle(row.prediction?.waveHeight, 'prediction')}>
+                      {row.prediction?.waveHeight?.toFixed(1) || '-'}
+                    </td>
+
+                    {/* Wave Period */}
+                    <td className={getCellStyle(row.historical?.wavePeriod, 'historical')}>
+                      {row.historical?.wavePeriod?.toFixed(1) || '-'}
+                    </td>
+                    <td className={getCellStyle(row.forecast?.wavePeriod, 'forecast')}>
+                      {row.forecast?.wavePeriod?.toFixed(1) || '-'}
+                    </td>
+                    <td className={getCellStyle(row.prediction?.wavePeriod, 'prediction')}>
+                      {row.prediction?.wavePeriod?.toFixed(1) || '-'}
+                    </td>
+
+                    {/* Swell Direction */}
+                    <td className={getCellStyle(row.historical?.swellDirection, 'historical')}>
+                      {row.historical?.swellDirection?.toFixed(0) || '-'}°
+                    </td>
+                    <td className={getCellStyle(row.forecast?.swellDirection, 'forecast')}>
+                      {row.forecast?.swellDirection?.toFixed(0) || '-'}°
+                    </td>
+                    <td className={getCellStyle(row.prediction?.swellDirection, 'prediction')}>
+                      {row.prediction?.swellDirection?.toFixed(0) || '-'}°
                     </td>
                   </tr>
                 );
