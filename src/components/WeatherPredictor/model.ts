@@ -19,81 +19,80 @@ export class WeatherPredictor {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  private normalize(data: number[][]): number[][] {
-    if (!this.meanStd) {
-      const features = data[0].length;
-      const mean = new Array(features).fill(0);
-      const std = new Array(features).fill(0);
+  private prepareData(data: WeatherData[]): {
+    inputs: number[][],
+    labels: number[][],
+    normalizer: { mean: number[], std: number[] }
+  } {
+    // Convert wind direction to sine and cosine components
+    const processedData = data.map(d => [
+      d.temperature,
+      d.windSpeed,
+      d.windGusts,
+      Math.sin(d.windDirection * Math.PI / 180), // sin component
+      Math.cos(d.windDirection * Math.PI / 180), // cos component
+      d.humidity || 0
+    ]);
+    
+    // Calculate mean and standard deviation for normalization
+    const mean = processedData[0].map((_, col) => 
+      processedData.reduce((sum, row) => sum + row[col], 0) / processedData.length
+    );
+    
+    const std = processedData[0].map((_, col) => {
+      const avg = mean[col];
+      const squareDiffs = processedData.map(row => Math.pow(row[col] - avg, 2));
+      return Math.sqrt(squareDiffs.reduce((sum, val) => sum + val, 0) / processedData.length);
+    });
+    
+    // Normalize the data
+    const normalizedData = processedData.map(row =>
+      row.map((val, i) => (val - mean[i]) / (std[i] || 1))
+    );
+    
+    const inputs: number[][] = [];
+    const labels: number[][] = [];
+    
+    // Prepare sequences for training
+    for (let i = 0; i < normalizedData.length - this.config.timeSteps - this.config.predictionSteps + 1; i++) {
+      const sequence = normalizedData.slice(i, i + this.config.timeSteps);
+      inputs.push(sequence.flat());
       
-      // Calculate mean
-      for (const row of data) {
-        for (let i = 0; i < features; i++) {
-          mean[i] += row[i];
-        }
-      }
-      for (let i = 0; i < features; i++) {
-        mean[i] /= data.length;
-      }
+      // Get multiple steps ahead for labels
+      const futureSteps = normalizedData
+        .slice(i + this.config.timeSteps, i + this.config.timeSteps + this.config.predictionSteps)
+        .map(step => [step[1], step[2], Math.atan2(step[3], step[4]) * 180 / Math.PI])
+        .flat();
       
-      // Calculate std with better numerical stability
-      for (const row of data) {
-        for (let i = 0; i < features; i++) {
-          std[i] += Math.pow(row[i] - mean[i], 2);
-        }
-      }
-      for (let i = 0; i < features; i++) {
-        std[i] = Math.sqrt(std[i] / data.length) + 1e-6; // Small epsilon to prevent division by zero
-      }
-      
-      this.meanStd = { mean, std };
+      labels.push(futureSteps);
     }
     
-    return data.map(row => 
-      row.map((val, i) => (val - this.meanStd!.mean[i]) / this.meanStd!.std[i])
-    );
-  }
-
-  private denormalize(data: number[][], featureIndices: number[]): number[][] {
-    if (!this.meanStd) return data;
-    
-    return data.map(row => 
-      row.map((val, i) => val * this.meanStd!.std[featureIndices[i]] + this.meanStd!.mean[featureIndices[i]])
-    );
+    return { inputs, labels, normalizer: { mean, std } };
   }
 
   private createModel(): tf.LayersModel {
     return tf.tidy(() => {
       const model = tf.sequential();
-
-      // Larger input layer for increased historical data
-      model.add(tf.layers.dense({
-        units: 256,
-        inputShape: [this.config.timeSteps * 5],
-        activation: 'relu'
+      
+      // LSTM layer for processing temporal sequences
+      model.add(tf.layers.lstm({
+        units: 128,
+        inputShape: [this.config.timeSteps, 6], // [timesteps, features]
+        returnSequences: false
       }));
       model.add(tf.layers.dropout({ rate: 0.2 }));
-
-      // Additional hidden layers
-      model.add(tf.layers.dense({ units: 512, activation: 'relu' }));
-      model.add(tf.layers.dropout({ rate: 0.3 }));
       
-      model.add(tf.layers.dense({ units: 256, activation: 'relu' }));
-      model.add(tf.layers.dropout({ rate: 0.2 }));
-      
-      model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
-      model.add(tf.layers.dropout({ rate: 0.1 }));
-
-      // Output layer
+      // Dense layer for final predictions
       model.add(tf.layers.dense({
-        units: 3,
+        units: 3 * this.config.predictionSteps, // Predict multiple steps ahead
         activation: 'linear'
       }));
-
+      
       model.compile({
         optimizer: tf.train.adam(this.config.learningRate),
         loss: 'meanSquaredError'
       });
-
+      
       return model;
     });
   }
@@ -107,33 +106,11 @@ export class WeatherPredictor {
       // Sort data by timestamp to ensure chronological order
       const sortedData = [...weatherData].sort((a, b) => a.timestamp - b.timestamp);
 
-      // Convert data to arrays for normalization
-      const rawData = sortedData.map(d => [
-        d.temperature,
-        d.windSpeed,
-        d.windGusts,
-        d.windDirection / 360, // Normalize direction to [0, 1]
-        d.humidity || 0
-      ]);
-
-      // Normalize the data
-      const normalizedData = this.normalize(rawData);
-
-      // Prepare sequences and labels with sliding window
-      const sequences: number[][] = [];
-      const labels: number[][] = [];
-
-      // Use more data for training by sliding the window
-      for (let i = 0; i <= normalizedData.length - this.config.timeSteps - 1; i++) {
-        const sequence = normalizedData.slice(i, i + this.config.timeSteps).flat();
-        const nextValues = normalizedData[i + this.config.timeSteps];
-        
-        sequences.push(sequence);
-        labels.push([nextValues[1], nextValues[2], nextValues[3]]); // wind speed, gusts, direction
-      }
+      // Prepare data for training
+      const { inputs, labels, normalizer } = this.prepareData(sortedData);
 
       // Create tensors
-      const features = tf.tensor2d(sequences);
+      const features = tf.tensor2d(inputs);
       const targets = tf.tensor2d(labels);
 
       // Create and train model with more epochs and validation
@@ -154,6 +131,9 @@ export class WeatherPredictor {
           }
         }
       });
+
+      // Store normalizer for later use
+      this.meanStd = normalizer;
 
       // Cleanup
       features.dispose();
@@ -184,11 +164,15 @@ export class WeatherPredictor {
         d.temperature,
         d.windSpeed,
         d.windGusts,
-        d.windDirection / 360,
+        Math.sin(d.windDirection * Math.PI / 180), // sin component
+        Math.cos(d.windDirection * Math.PI / 180), // cos component
         d.humidity || 0
       ]);
 
-      let normalizedInput = this.normalize(initialRawData);
+      // Normalize input data
+      const normalizedInput = initialRawData.map(row =>
+        row.map((val, i) => (val - this.meanStd!.mean[i]) / (this.meanStd!.std[i] || 1))
+      );
 
       // Generate predictions for 24 hours
       for (let hour = 0; hour < 24; hour++) {
@@ -203,7 +187,9 @@ export class WeatherPredictor {
         const normalizedPrediction = await outputTensor.array() as number[][];
         
         // Denormalize prediction
-        const denormalizedPrediction = this.denormalize(normalizedPrediction, [1, 2, 3])[0];
+        const denormalizedPrediction = normalizedPrediction[0].map((val, i) => 
+          val * (this.meanStd!.std[Math.floor(i / 3)] || 1) + this.meanStd!.mean[Math.floor(i / 3)]
+        );
         
         // Calculate confidence
         const confidence = Math.max(0.08, 1 - (hour * 0.04));
@@ -213,7 +199,7 @@ export class WeatherPredictor {
           startTime: timestamp,
           windSpeed: Math.max(0, denormalizedPrediction[0]),
           windGusts: Math.max(0, denormalizedPrediction[1]),
-          windDirection: ((Math.round(denormalizedPrediction[2] * 360) % 360) + 360) % 360,
+          windDirection: ((Math.round(Math.atan2(denormalizedPrediction[2], denormalizedPrediction[3]) * 180 / Math.PI) % 360) + 360) % 360,
           confidence
         };
         
@@ -222,10 +208,11 @@ export class WeatherPredictor {
         // Update input for next prediction
         const newDataPoint = [
           normalizedInput[normalizedInput.length - 1][0], // Keep last temperature
-          normalizedPrediction[0][0],
-          normalizedPrediction[0][1],
-          normalizedPrediction[0][2],
-          normalizedInput[normalizedInput.length - 1][4]  // Keep last humidity
+          denormalizedPrediction[0],
+          denormalizedPrediction[1],
+          denormalizedPrediction[2],
+          denormalizedPrediction[3],
+          normalizedInput[normalizedInput.length - 1][5]  // Keep last humidity
         ];
         
         normalizedInput = [...normalizedInput.slice(1), newDataPoint];

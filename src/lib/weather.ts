@@ -4,13 +4,21 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
   console.log('Fetching weather data for:', { lat, lon, hours });
   
   try {
+    // Calculate start and end dates
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - (hours * 60 * 60 * 1000));
+    
+    // Format dates as YYYY-MM-DD
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    
     // Get both past data and forecast
     const response = await fetch(
       `https://api.open-meteo.com/v1/forecast?` +
       `latitude=${lat}&longitude=${lon}&` +
       `hourly=temperature_2m,relative_humidity_2m,windspeed_10m,winddirection_10m,windgusts_10m&` +
-      `past_hours=${hours}&forecast_hours=48&` + // Get 5 days of historical data
-      `timezone=auto`
+      `start_date=${startDateStr}&end_date=${endDateStr}&` +
+      `timezone=auto&windspeed_unit=kn`
     );
 
     if (!response.ok) {
@@ -18,20 +26,23 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
     }
 
     const data = await response.json();
-    console.log('Received weather data:', data);
+    console.log('Received weather data:', {
+      requestedLocation: { lat, lon },
+      receivedLocation: { lat: data.latitude, lon: data.longitude },
+      timeRange: { start: startDateStr, end: endDateStr },
+      dataPoints: data.hourly?.time?.length || 0
+    });
 
     if (!data.hourly || !Array.isArray(data.hourly.time)) {
       throw new Error('Invalid weather data format');
     }
 
-    // Convert wind speed from m/s to knots
-    const msToKnots = 1.94384;
-    
+    // Data is already in knots due to windspeed_unit=kn parameter
     const weatherData = data.hourly.time.map((timestamp: string, i: number) => ({
       timestamp: new Date(timestamp).getTime(),
       temperature: data.hourly.temperature_2m[i],
-      windSpeed: data.hourly.windspeed_10m[i] * msToKnots,
-      windGusts: data.hourly.windgusts_10m[i] * msToKnots,
+      windSpeed: data.hourly.windspeed_10m[i],
+      windGusts: data.hourly.windgusts_10m[i],
       windDirection: data.hourly.winddirection_10m[i],
       humidity: data.hourly.relative_humidity_2m[i]
     }));
