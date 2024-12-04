@@ -180,67 +180,40 @@ export function WeatherPredictor() {
             <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-8">
               <div className="space-y-6">
                 <div className="flex items-center justify-between text-gray-200">
-                  <div className="font-medium">
-                    {progress?.stage === 'initializing' && 'Initializing model...'}
-                    {progress?.stage === 'training' && `Training model (Epoch ${progress.currentEpoch}/${progress.totalEpochs})`}
-                    {progress?.stage === 'predicting' && 'Generating predictions...'}
-                    {!progress && 'Preparing analysis...'}
+                  <div className="flex items-center gap-4">
+                    <div className="font-medium">
+                      {progress?.stage === 'initializing' && 'Initializing model...'}
+                      {progress?.stage === 'training' && `Training model (${progress.currentEpoch}/${progress.totalEpochs})`}
+                      {progress?.stage === 'predicting' && 'Generating predictions...'}
+                      {!progress && 'Preparing analysis...'}
+                    </div>
+                    {progress?.stage === 'training' && progress.loss !== undefined && (
+                      <div className="flex items-center gap-2 text-sm font-mono bg-gray-800/40 px-3 py-1.5 rounded-lg border border-gray-700/30">
+                        <span className="text-gray-400">Loss</span>
+                        <span className="text-indigo-300 tabular-nums transition-all duration-300 ease-out">
+                          {progress.loss.toFixed(4)}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-sm text-indigo-400/80">
+                  <div className="text-sm text-indigo-400/80 bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/20">
                     {useLightModel ? 'Optimized' : 'Standard'} • {performancePreset}
                   </div>
                 </div>
                 
-                {/* Win 3.1 style progress bar */}
+                {/* Progress bar with smooth animation */}
                 <div className="relative">
-                  <div className="overflow-hidden h-6 rounded bg-gray-800/50 border border-gray-700/50">
+                  <div className="overflow-hidden h-2 rounded-full bg-gray-800/50">
                     <div 
-                      className="h-full bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#4f46e5_10px,#4f46e5_20px)]"
+                      className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all duration-300 ease-out"
                       style={{
                         width: `${getProgressPercentage()}%`,
-                        transition: 'width 0.5s ease-out',
                       }}
-                    />
-                  </div>
-                  
-                  {/* Scanline effect */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm text-gray-400">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Data collection</span>
-                      <span className="text-indigo-400">Complete</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Model initialization</span>
-                      <span className={progress ? 'text-indigo-400' : 'text-gray-500'}>
-                        {progress ? 'Complete' : 'Pending'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Training progress</span>
-                      <span className={progress?.stage === 'training' ? 'text-white' : 'text-gray-500'}>
-                        {progress?.stage === 'training' ? `${Math.round((progress.currentEpoch / progress.totalEpochs) * 100)}%` : 'Pending'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Prediction generation</span>
-                      <span className={progress?.stage === 'predicting' ? 'text-indigo-400' : 'text-gray-500'}>
-                        {progress?.stage === 'predicting' ? 'Complete' : 'Pending'}
-                      </span>
+                    >
+                      <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.15)_50%,transparent_100%)] animate-shine"></div>
                     </div>
                   </div>
                 </div>
-
-                {progress?.stage === 'training' && progress.loss > 0 && (
-                  <div className="text-sm text-gray-500">
-                    Current Loss: {progress.loss.toFixed(4)}
-                  </div>
-                )}
               </div>
             </div>
           </div>
