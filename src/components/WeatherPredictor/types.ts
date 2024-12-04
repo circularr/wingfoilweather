@@ -1,10 +1,8 @@
 export interface WeatherData {
   timestamp: number;
-  temperature: number;
   windSpeed: number;
   windGusts: number;
   windDirection: number;
-  humidity: number;
   waveHeight?: number;
   wavePeriod?: number;
   swellDirection?: number;
@@ -14,11 +12,9 @@ export interface WeatherData {
 export interface PredictionChunk {
   startTime: number;
   endTime: number;
-  temperature: number;
   windSpeed: number;
   windGusts: number;
   windDirection: number;
-  humidity: number;
   waveHeight: number;
   wavePeriod: number;
   swellDirection: number;
@@ -51,7 +47,6 @@ export interface ModelMetricsType {
   confidenceIntervals: {
     wind: number;
     direction: number;
-    temperature: number;
   };
   sampleSize: number;
   timestamp: string;

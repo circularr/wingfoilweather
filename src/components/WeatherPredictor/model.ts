@@ -13,11 +13,9 @@ const calculateStats = (data: WeatherData[]): DataStats => {
   };
 
   const numericFields = [
-    'temperature',
     'windSpeed',
     'windGusts',
     'windDirection',
-    'humidity',
     'waveHeight',
     'wavePeriod',
     'swellDirection'
@@ -69,14 +67,12 @@ const normalizeData = (data: WeatherData[], stats: DataStats): WeatherData[] => 
 const denormalizePrediction = (pred: number[], stats: DataStats): WeatherData => {
   return {
     timestamp: Date.now(),
-    temperature: pred[0] * stats.std.temperature + stats.mean.temperature,
-    windSpeed: pred[1] * stats.std.windSpeed + stats.mean.windSpeed,
-    windGusts: pred[2] * stats.std.windGusts + stats.mean.windGusts,
-    windDirection: ((Math.atan2(pred[4], pred[3]) * (180 / Math.PI)) + 360) % 360,
-    humidity: pred[5] * stats.std.humidity + stats.mean.humidity,
-    waveHeight: pred[6] * stats.std.waveHeight + stats.mean.waveHeight,
-    wavePeriod: pred[7] * stats.std.wavePeriod + stats.mean.wavePeriod,
-    swellDirection: ((Math.atan2(pred[9], pred[8]) * (180 / Math.PI)) + 360) % 360,
+    windSpeed: pred[0] * stats.std.windSpeed + stats.mean.windSpeed,
+    windGusts: pred[1] * stats.std.windGusts + stats.mean.windGusts,
+    windDirection: ((Math.atan2(pred[3], pred[2]) * (180 / Math.PI)) + 360) % 360,
+    waveHeight: pred[4] * stats.std.waveHeight + stats.mean.waveHeight,
+    wavePeriod: pred[5] * stats.std.wavePeriod + stats.mean.wavePeriod,
+    swellDirection: ((Math.atan2(pred[7], pred[6]) * (180 / Math.PI)) + 360) % 360,
     isForecast: true
   };
 };
@@ -90,12 +86,10 @@ const prepareTrainingData = (data: WeatherData[], timeSteps: number) => {
 
   for (let i = timeSteps; i < normalizedData.length; i++) {
     const inputSequence = normalizedData.slice(i - timeSteps, i).map((d) => [
-      d.temperature,
       d.windSpeed,
       d.windGusts,
       Math.sin((d.windDirection * Math.PI) / 180),
       Math.cos((d.windDirection * Math.PI) / 180),
-      d.humidity,
       d.waveHeight || 0,
       d.wavePeriod || 0,
       Math.sin(((d.swellDirection || 0) * Math.PI) / 180),
@@ -103,12 +97,10 @@ const prepareTrainingData = (data: WeatherData[], timeSteps: number) => {
     ]);
 
     const targetFeatures = [
-      normalizedData[i].temperature,
       normalizedData[i].windSpeed,
       normalizedData[i].windGusts,
       Math.sin((normalizedData[i].windDirection * Math.PI) / 180),
       Math.cos((normalizedData[i].windDirection * Math.PI) / 180),
-      normalizedData[i].humidity,
       normalizedData[i].waveHeight || 0,
       normalizedData[i].wavePeriod || 0,
       Math.sin(((normalizedData[i].swellDirection || 0) * Math.PI) / 180),
@@ -166,7 +158,7 @@ export function calculateR2Score(actuals: number[], predictions: number[]): numb
   const meanActual = actuals.reduce((sum, val) => sum + val, 0) / actuals.length;
   const totalSS = actuals.reduce((sum, val) => sum + Math.pow(val - meanActual, 2), 0);
   const residualSS = actuals.reduce((sum, actual, i) => sum + Math.pow(actual - predictions[i], 2), 0);
-  return 1 - (residualSS / totalSS);
+  return 1 - residualSS / totalSS;
 }
 
 export async function trainModel(
@@ -252,16 +244,22 @@ export async function trainModel(
 
   // Generate predictions on validation set
   const validationSize = Math.floor(inputs.shape[0] * 0.2);
-  const validationInputs = inputs.slice([inputs.shape[0] - validationSize, 0, 0], [validationSize, -1, -1]);
-  const validationTargets = targets.slice([targets.shape[0] - validationSize, 0], [validationSize, -1]);
+  const validationInputs = inputs.slice(
+    [inputs.shape[0] - validationSize, 0, 0],
+    [validationSize, -1, -1]
+  );
+  const validationTargets = targets.slice(
+    [targets.shape[0] - validationSize, 0],
+    [validationSize, -1]
+  );
 
   const predictedTensor = model.predict(validationInputs) as tf.Tensor;
-  const predictedArray = await predictedTensor.array() as number[][];
-  const actualArray = await validationTargets.array() as number[][];
+  const predictedArray = (await predictedTensor.array()) as number[][];
+  const actualArray = (await validationTargets.array()) as number[][];
 
-  // Extract wind speed predictions and actuals for metrics (index 1 is wind speed)
-  const predictions = predictedArray.map(pred => pred[1]);
-  const actuals = actualArray.map(actual => actual[1]);
+  // Extract wind speed predictions and actuals for metrics (index 0 is wind speed)
+  const predictions = predictedArray.map((pred) => pred[0]);
+  const actuals = actualArray.map((actual) => actual[0]);
 
   // Dispose of tensors
   inputs.dispose();
@@ -298,12 +296,10 @@ export async function predictNextHours(
   // Generate predictions for each hour
   for (let i = 0; i < predictionSteps; i++) {
     const inputSequence = currentInput.map((d) => [
-      d.temperature,
       d.windSpeed,
       d.windGusts,
       Math.sin((d.windDirection * Math.PI) / 180),
       Math.cos((d.windDirection * Math.PI) / 180),
-      d.humidity,
       d.waveHeight || 0,
       d.wavePeriod || 0,
       Math.sin(((d.swellDirection || 0) * Math.PI) / 180),

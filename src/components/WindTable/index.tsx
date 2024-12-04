@@ -86,23 +86,11 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
 
   // Prepare data for charts
   const chartData = {
-    temperature: allData.map((d) => ({
-      timestamp: d.timestamp,
-      historical: d.historical?.temperature,
-      forecast: d.forecast?.temperature,
-      prediction: d.prediction?.temperature
-    })),
     windSpeed: allData.map((d) => ({
       timestamp: d.timestamp,
       historical: d.historical?.windSpeed,
       forecast: d.forecast?.windSpeed,
       prediction: d.prediction?.windSpeed
-    })),
-    windGusts: allData.map((d) => ({
-      timestamp: d.timestamp,
-      historical: d.historical?.windGusts,
-      forecast: d.forecast?.windGusts,
-      prediction: d.prediction?.windGusts
     })),
     windDirection: allData.map((d) => ({
       timestamp: d.timestamp,
@@ -115,18 +103,6 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
       historical: d.historical?.waveHeight,
       forecast: d.forecast?.waveHeight,
       prediction: d.prediction?.waveHeight
-    })),
-    wavePeriod: allData.map((d) => ({
-      timestamp: d.timestamp,
-      historical: d.historical?.wavePeriod,
-      forecast: d.forecast?.wavePeriod,
-      prediction: d.prediction?.wavePeriod
-    })),
-    swellDirection: allData.map((d) => ({
-      timestamp: d.timestamp,
-      historical: d.historical?.swellDirection,
-      forecast: d.forecast?.swellDirection,
-      prediction: d.prediction?.swellDirection
     }))
   };
 
@@ -134,25 +110,12 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
     <div className="mt-8 bg-slate-900/40 backdrop-blur-xl rounded-2xl border border-slate-800/50">
       <div className="p-5 border-b border-slate-800/50">
         <h2 className="text-xl font-semibold text-slate-100 tracking-tight">
-          Complete Weather Data Analysis
+          Wind and Wave Data Analysis
         </h2>
       </div>
 
       {/* Comparison Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-5 p-5">
-        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
-          <h3 className="text-base font-medium mb-3 text-slate-300">Temperature</h3>
-          <div className="h-64">
-            <Chart
-              data={chartData.temperature}
-              yLabel="Temperature (°C)"
-              historicalLabel="Historical Data"
-              forecastLabel="OpenMeteo Forecast"
-              predictionLabel="AI Prediction"
-              id="temperature-chart"
-            />
-          </div>
-        </div>
         <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
           <h3 className="text-base font-medium mb-3 text-slate-300">Wind Speed</h3>
           <div className="h-64">
@@ -166,8 +129,34 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             />
           </div>
         </div>
-        {/* Add other charts similarly */}
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Wind Direction</h3>
+          <div className="h-64">
+            <Chart
+              data={chartData.windDirection}
+              yLabel="Wind Direction (°)"
+              historicalLabel="Historical Data"
+              forecastLabel="OpenMeteo Forecast"
+              predictionLabel="AI Prediction"
+              id="wind-direction-chart"
+            />
+          </div>
+        </div>
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Wave Height</h3>
+          <div className="h-64">
+            <Chart
+              data={chartData.waveHeight}
+              yLabel="Wave Height (m)"
+              historicalLabel="Historical Data"
+              forecastLabel="OpenMeteo Forecast"
+              predictionLabel="AI Prediction"
+              id="wave-height-chart"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+  
