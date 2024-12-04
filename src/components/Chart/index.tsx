@@ -75,8 +75,8 @@ export function Chart({ data, yLabel, forecastLabel, predictionLabel, id }: Char
           {
             label: forecastLabel,
             data: forecastData,
-            borderColor: 'rgb(45, 212, 191)',  // teal-400
-            backgroundColor: 'rgba(45, 212, 191, 0.1)',
+            borderColor: 'rgb(165 180 252)',  // text-indigo-300
+            backgroundColor: 'rgba(165 180 252, 0.1)',
             borderWidth: 1.5,
             pointRadius: 0,
             pointHoverRadius: 4,
@@ -86,8 +86,8 @@ export function Chart({ data, yLabel, forecastLabel, predictionLabel, id }: Char
           {
             label: predictionLabel,
             data: predictionData,
-            borderColor: 'rgb(52, 211, 153)',  // emerald-400
-            backgroundColor: 'rgba(52, 211, 153, 0.1)',
+            borderColor: 'rgb(240 171 252)',  // text-fuchsia-300
+            backgroundColor: 'rgba(240 171 252, 0.1)',
             borderWidth: 1.5,
             pointRadius: 0,
             pointHoverRadius: 4,

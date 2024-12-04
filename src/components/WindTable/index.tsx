@@ -171,6 +171,11 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             forecastLabel="OpenMeteo Forecast"
             predictionLabel="AI Prediction"
             id="temperature-chart"
+            colors={{
+              historical: 'rgb(186 230 253)', // text-sky-200
+              forecast: 'rgb(165 180 252)',   // text-indigo-300
+              prediction: 'rgb(240 171 252)', // text-fuchsia-300
+            }}
           />
         </div>
         <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
@@ -181,6 +186,11 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             forecastLabel="OpenMeteo Forecast"
             predictionLabel="AI Prediction"
             id="wind-speed-chart"
+            colors={{
+              historical: 'rgb(186 230 253)', // text-sky-200
+              forecast: 'rgb(165 180 252)',   // text-indigo-300
+              prediction: 'rgb(240 171 252)', // text-fuchsia-300
+            }}
           />
         </div>
         <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
@@ -191,6 +201,11 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             forecastLabel="OpenMeteo Forecast"
             predictionLabel="AI Prediction"
             id="wind-gusts-chart"
+            colors={{
+              historical: 'rgb(186 230 253)', // text-sky-200
+              forecast: 'rgb(165 180 252)',   // text-indigo-300
+              prediction: 'rgb(240 171 252)', // text-fuchsia-300
+            }}
           />
         </div>
         <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
@@ -201,6 +216,11 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             forecastLabel="OpenMeteo Forecast"
             predictionLabel="AI Prediction"
             id="wind-direction-chart"
+            colors={{
+              historical: 'rgb(186 230 253)', // text-sky-200
+              forecast: 'rgb(165 180 252)',   // text-indigo-300
+              prediction: 'rgb(240 171 252)', // text-fuchsia-300
+            }}
           />
         </div>
         <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
@@ -211,6 +231,11 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             forecastLabel="OpenMeteo Forecast"
             predictionLabel="AI Prediction"
             id="wave-height-chart"
+            colors={{
+              historical: 'rgb(186 230 253)', // text-sky-200
+              forecast: 'rgb(165 180 252)',   // text-indigo-300
+              prediction: 'rgb(240 171 252)', // text-fuchsia-300
+            }}
           />
         </div>
         <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
@@ -221,6 +246,11 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             forecastLabel="OpenMeteo Forecast"
             predictionLabel="AI Prediction"
             id="wave-period-chart"
+            colors={{
+              historical: 'rgb(186 230 253)', // text-sky-200
+              forecast: 'rgb(165 180 252)',   // text-indigo-300
+              prediction: 'rgb(240 171 252)', // text-fuchsia-300
+            }}
           />
         </div>
         <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
@@ -231,6 +261,11 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             forecastLabel="OpenMeteo Forecast"
             predictionLabel="AI Prediction"
             id="swell-direction-chart"
+            colors={{
+              historical: 'rgb(186 230 253)', // text-sky-200
+              forecast: 'rgb(165 180 252)',   // text-indigo-300
+              prediction: 'rgb(240 171 252)', // text-fuchsia-300
+            }}
           />
         </div>
       </div>
