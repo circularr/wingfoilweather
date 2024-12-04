@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ModelInfo } from '../ModelInfo';
 
 interface MapProps {
   onLocationSelect: (lat: number, lon: number) => void;
@@ -28,7 +27,7 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     
     mapRef.current = map;
 
-    // Add custom map style with muted colors
+    // Custom map style with cooler blue ocean
     L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>',
       maxZoom: 19,
@@ -107,7 +106,7 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     <div className="relative">
       <style jsx global>{`
         .map-tiles {
-          filter: saturate(0.8) brightness(0.9);
+          filter: saturate(0.85) brightness(0.9) hue-rotate(10deg);
         }
         .leaflet-container {
           background: #1a1b1e;
@@ -132,11 +131,6 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
         ref={containerRef} 
         className="w-full h-[600px] bg-gray-900 rounded-xl overflow-hidden shadow-lg"
       />
-      
-      {/* Model Info Button */}
-      <div className="absolute top-4 left-4 z-[1000]">
-        <ModelInfo />
-      </div>
     </div>
   );
 });
