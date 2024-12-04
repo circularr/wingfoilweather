@@ -11,14 +11,36 @@ interface WindTableProps {
 
 export function WindTable({ historicalData, predictions, forecastData }: WindTableProps) {
   const formatDateTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString('en-GB', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
+    const date = new Date(timestamp);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    let dayStr = '';
+    if (date.toDateString() === today.toDateString()) {
+      dayStr = 'Today';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      dayStr = 'Tomorrow';
+    } else {
+      dayStr = date.toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+      });
+    }
+
+    const timeStr = date.toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     });
+
+    return (
+      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+        <span className="font-medium text-slate-200">{dayStr}</span>
+        <span className="text-slate-400 tabular-nums">{timeStr}</span>
+      </div>
+    );
   };
 
   // Create a map to deduplicate entries with the same timestamp
@@ -64,15 +86,15 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
 
   // Helper function to style the cells based on data source
   const getCellStyle = (value: number | undefined, source: 'historical' | 'forecast' | 'prediction') => {
-    if (value === undefined) return 'text-gray-300';
-    const baseStyle = 'px-4 py-2 border-b';
+    if (value === undefined) return 'text-slate-500 font-normal px-3 py-2 whitespace-nowrap';
+    const baseStyle = 'px-3 py-2 font-medium tabular-nums whitespace-nowrap tracking-tight';
     switch (source) {
       case 'historical':
-        return `${baseStyle} bg-blue-50`;
+        return `${baseStyle} text-sky-200`;
       case 'forecast':
-        return `${baseStyle} bg-green-50`;
+        return `${baseStyle} text-indigo-300`;
       case 'prediction':
-        return `${baseStyle} bg-purple-50`;
+        return `${baseStyle} text-fuchsia-300`;
       default:
         return baseStyle;
     }
@@ -118,29 +140,31 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
   };
 
   return (
-    <div className="mt-8">
-      <h2 className="text-xl font-semibold mb-4">Complete Weather Data Analysis</h2>
+    <div className="mt-8 bg-slate-900/40 backdrop-blur-xl rounded-2xl border border-slate-800/50">
+      <div className="p-5 border-b border-slate-800/50">
+        <h2 className="text-xl font-semibold text-slate-100 tracking-tight">Complete Weather Data Analysis</h2>
+      </div>
       
       {/* Legend */}
-      <div className="flex gap-4 mb-4 text-sm">
+      <div className="flex flex-wrap gap-x-6 gap-y-2 px-5 py-3 text-sm border-b border-slate-800/50">
         <div className="flex items-center">
-          <div className="w-4 h-4 bg-blue-50 border border-blue-200 mr-2"></div>
-          <span>Historical Data</span>
+          <div className="w-2 h-2 rounded-full bg-sky-400/90 ring-2 ring-sky-400/20 mr-2"></div>
+          <span className="text-sky-200 font-medium">Historical Data</span>
         </div>
         <div className="flex items-center">
-          <div className="w-4 h-4 bg-green-50 border border-green-200 mr-2"></div>
-          <span>OpenMeteo Forecast</span>
+          <div className="w-2 h-2 rounded-full bg-indigo-400/90 ring-2 ring-indigo-400/20 mr-2"></div>
+          <span className="text-indigo-300 font-medium">OpenMeteo Forecast</span>
         </div>
         <div className="flex items-center">
-          <div className="w-4 h-4 bg-purple-50 border border-purple-200 mr-2"></div>
-          <span>AI Prediction</span>
+          <div className="w-2 h-2 rounded-full bg-fuchsia-400/90 ring-2 ring-fuchsia-400/20 mr-2"></div>
+          <span className="text-fuchsia-300 font-medium">AI Prediction</span>
         </div>
       </div>
 
       {/* Comparison Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Temperature Comparison</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-5 p-5">
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Temperature</h3>
           <Chart 
             data={chartData.temperature}
             yLabel="Temperature (°C)"
@@ -149,8 +173,8 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             id="temperature-chart"
           />
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Wind Speed Comparison</h3>
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Wind Speed</h3>
           <Chart 
             data={chartData.windSpeed}
             yLabel="Wind Speed (m/s)"
@@ -159,8 +183,8 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             id="wind-speed-chart"
           />
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Wind Gusts Comparison</h3>
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Wind Gusts</h3>
           <Chart 
             data={chartData.windGusts}
             yLabel="Wind Gusts (m/s)"
@@ -169,8 +193,8 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             id="wind-gusts-chart"
           />
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Wind Direction Comparison</h3>
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Wind Direction</h3>
           <Chart 
             data={chartData.windDirection}
             yLabel="Wind Direction (°)"
@@ -179,8 +203,8 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             id="wind-direction-chart"
           />
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Wave Height Comparison</h3>
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Wave Height</h3>
           <Chart 
             data={chartData.waveHeight}
             yLabel="Wave Height (m)"
@@ -189,8 +213,8 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             id="wave-height-chart"
           />
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Wave Period Comparison</h3>
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Wave Period</h3>
           <Chart 
             data={chartData.wavePeriod}
             yLabel="Wave Period (s)"
@@ -199,8 +223,8 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
             id="wave-period-chart"
           />
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">Swell Direction Comparison</h3>
+        <div className="bg-slate-900/30 backdrop-blur-sm p-4 rounded-xl border border-slate-800/30">
+          <h3 className="text-base font-medium mb-3 text-slate-300">Swell Direction</h3>
           <Chart 
             data={chartData.swellDirection}
             yLabel="Swell Direction (°)"
@@ -211,52 +235,51 @@ export function WindTable({ historicalData, predictions, forecastData }: WindTab
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-gray-200 rounded-lg shadow">
-        <div className="max-h-[600px] overflow-y-auto">
-          <table className="min-w-full bg-white">
+      <div className="overflow-x-auto">
+        <div className="max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-800/50">
+          <table className="min-w-full">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="sticky left-0 z-20 bg-gray-50 px-4 py-2 border-b border-r text-left">Date & Time</th>
-                <th className="px-4 py-2 border-b text-center" colSpan={3}>Temperature (°C)</th>
-                <th className="px-4 py-2 border-b text-center" colSpan={3}>Wind Speed (m/s)</th>
-                <th className="px-4 py-2 border-b text-center" colSpan={3}>Wind Gusts (m/s)</th>
-                <th className="px-4 py-2 border-b text-center" colSpan={3}>Wind Direction (°)</th>
-                <th className="px-4 py-2 border-b text-center" colSpan={3}>Wave Height (m)</th>
-                <th className="px-4 py-2 border-b text-center" colSpan={3}>Wave Period (s)</th>
-                <th className="px-4 py-2 border-b text-center" colSpan={3}>Swell Direction (°)</th>
+              <tr className="bg-slate-900 border-b border-slate-700">
+                <th className="sticky left-0 z-20 bg-slate-900 px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">
+                  Time
+                </th>
+                <th className="px-3 py-2.5 text-center font-medium text-slate-300 whitespace-nowrap" colSpan={3}>Temperature (°C)</th>
+                <th className="px-3 py-2.5 text-center font-medium text-slate-300 whitespace-nowrap" colSpan={3}>Wind Speed (m/s)</th>
+                <th className="px-3 py-2.5 text-center font-medium text-slate-300 whitespace-nowrap" colSpan={3}>Wind Gusts (m/s)</th>
+                <th className="px-3 py-2.5 text-center font-medium text-slate-300 whitespace-nowrap" colSpan={3}>Wind Direction (°)</th>
+                <th className="px-3 py-2.5 text-center font-medium text-slate-300 whitespace-nowrap" colSpan={3}>Wave Height (m)</th>
+                <th className="px-3 py-2.5 text-center font-medium text-slate-300 whitespace-nowrap" colSpan={3}>Wave Period (s)</th>
+                <th className="px-3 py-2.5 text-center font-medium text-slate-300 whitespace-nowrap" colSpan={3}>Swell Direction (°)</th>
               </tr>
-              <tr className="bg-gray-100 text-sm">
-                <th className="sticky left-0 z-20 bg-gray-100 px-4 py-1 border-b border-r"></th>
-                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
-                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
-                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
-                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
-                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
-                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
-                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
-                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
-                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
-                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
-                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
-                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
-                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
-                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
-                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
-                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
-                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
-                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
-                <th className="px-4 py-1 border-b bg-blue-50">Hist</th>
-                <th className="px-4 py-1 border-b bg-green-50">Forecast</th>
-                <th className="px-4 py-1 border-b bg-purple-50">AI</th>
+              <tr className="text-xs bg-slate-800 border-b border-slate-700">
+                <th className="sticky left-0 z-20 bg-slate-800 px-3 py-2"></th>
+                <th className="px-3 py-2 text-sky-200 font-medium whitespace-nowrap">Hist</th>
+                <th className="px-3 py-2 text-indigo-300 font-medium whitespace-nowrap">Forecast</th>
+                <th className="px-3 py-2 text-fuchsia-300 font-medium whitespace-nowrap">AI</th>
+                <th className="px-3 py-2 text-sky-200 font-medium whitespace-nowrap">Hist</th>
+                <th className="px-3 py-2 text-indigo-300 font-medium whitespace-nowrap">Forecast</th>
+                <th className="px-3 py-2 text-fuchsia-300 font-medium whitespace-nowrap">AI</th>
+                <th className="px-3 py-2 text-sky-200 font-medium whitespace-nowrap">Hist</th>
+                <th className="px-3 py-2 text-indigo-300 font-medium whitespace-nowrap">Forecast</th>
+                <th className="px-3 py-2 text-fuchsia-300 font-medium whitespace-nowrap">AI</th>
+                <th className="px-3 py-2 text-sky-200 font-medium whitespace-nowrap">Hist</th>
+                <th className="px-3 py-2 text-indigo-300 font-medium whitespace-nowrap">Forecast</th>
+                <th className="px-3 py-2 text-fuchsia-300 font-medium whitespace-nowrap">AI</th>
+                <th className="px-3 py-2 text-sky-200 font-medium whitespace-nowrap">Hist</th>
+                <th className="px-3 py-2 text-indigo-300 font-medium whitespace-nowrap">Forecast</th>
+                <th className="px-3 py-2 text-fuchsia-300 font-medium whitespace-nowrap">AI</th>
+                <th className="px-3 py-2 text-sky-200 font-medium whitespace-nowrap">Hist</th>
+                <th className="px-3 py-2 text-indigo-300 font-medium whitespace-nowrap">Forecast</th>
+                <th className="px-3 py-2 text-fuchsia-300 font-medium whitespace-nowrap">AI</th>
               </tr>
             </thead>
-            <tbody className="text-sm">
+            <tbody className="text-sm divide-y divide-slate-800">
               {allData.map((row) => {
                 const isPastTime = isPast(row.timestamp);
                 return (
-                  <tr key={`${row.timestamp}-${row.historical ? 'h' : ''}${row.forecast ? 'f' : ''}${row.prediction ? 'p' : ''}`} 
-                      className={`hover:bg-gray-50 ${isPastTime ? 'bg-opacity-60' : ''}`}>
-                    <td className="sticky left-0 bg-white px-4 py-2 border-b border-r font-medium whitespace-nowrap">
+                  <tr key={row.timestamp} 
+                      className={`${isPastTime ? 'opacity-90' : ''} hover:bg-slate-800/30 transition-colors duration-150`}>
+                    <td className="sticky left-0 z-10 bg-slate-900 px-3 py-2 whitespace-nowrap border-r border-slate-700">
                       {formatDateTime(row.timestamp)}
                     </td>
                     

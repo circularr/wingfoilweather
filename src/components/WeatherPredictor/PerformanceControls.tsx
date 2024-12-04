@@ -17,7 +17,7 @@ export function PerformanceControls({
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center gap-8 p-6">
       <div className="flex-1 min-w-[280px]">
-        <label className="text-sm uppercase tracking-wider text-gray-300 font-medium mb-3 block">
+        <label className="text-sm uppercase tracking-wider text-white font-medium mb-3 block">
           Performance Mode
         </label>
         <div className="flex gap-3">
@@ -29,7 +29,7 @@ export function PerformanceControls({
                 relative px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200
                 ${performancePreset === preset
                   ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 scale-105 hover:bg-indigo-400'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'}
+                  : 'bg-gray-800 text-gray-100 hover:bg-gray-700 hover:text-white'}
                 before:absolute before:inset-0 before:rounded-lg before:border
                 ${performancePreset === preset
                   ? 'before:border-indigo-400/50'
@@ -57,8 +57,8 @@ export function PerformanceControls({
               flex items-center gap-3 px-5 py-3 rounded-lg cursor-pointer
               transition-all duration-200
               ${useLightModel
-                ? 'bg-indigo-500/20 text-indigo-300'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700/80'}
+                ? 'bg-indigo-500/20 text-white'
+                : 'bg-gray-800 text-gray-100 hover:bg-gray-700/80'}
               before:absolute before:inset-0 before:rounded-lg before:border
               ${useLightModel
                 ? 'before:border-indigo-400/30'
@@ -66,7 +66,7 @@ export function PerformanceControls({
             `}
           >
             <svg 
-              className={`w-4 h-4 transition-colors ${useLightModel ? 'text-indigo-300' : 'text-gray-500'}`}
+              className={`w-4 h-4 transition-colors ${useLightModel ? 'text-indigo-200' : 'text-gray-300'}`}
               fill="none" 
               viewBox="0 0 24 24" 
               stroke="currentColor"
@@ -81,7 +81,7 @@ export function PerformanceControls({
             <span className="text-sm font-medium">Light Model</span>
           </label>
         </div>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-gray-300">
           Optimized for speed
         </span>
       </div>

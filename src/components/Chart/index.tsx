@@ -75,20 +75,22 @@ export function Chart({ data, yLabel, forecastLabel, predictionLabel, id }: Char
           {
             label: forecastLabel,
             data: forecastData,
-            borderColor: 'rgb(34, 197, 94)',
-            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            borderWidth: 2,
-            pointRadius: 2,
+            borderColor: 'rgb(45, 212, 191)',  // teal-400
+            backgroundColor: 'rgba(45, 212, 191, 0.1)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            pointHoverRadius: 4,
             tension: 0.4,
             fill: false
           },
           {
             label: predictionLabel,
             data: predictionData,
-            borderColor: 'rgb(168, 85, 247)',
-            backgroundColor: 'rgba(168, 85, 247, 0.1)',
-            borderWidth: 2,
-            pointRadius: 2,
+            borderColor: 'rgb(52, 211, 153)',  // emerald-400
+            backgroundColor: 'rgba(52, 211, 153, 0.1)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            pointHoverRadius: 4,
             tension: 0.4,
             fill: false
           }
@@ -98,43 +100,119 @@ export function Chart({ data, yLabel, forecastLabel, predictionLabel, id }: Char
         responsive: true,
         maintainAspectRatio: false,
         interaction: {
-          mode: 'index',
-          intersect: false,
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false
         },
         plugins: {
           legend: {
             position: 'top',
+            align: 'start',
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              padding: 15,
+              font: {
+                family: "'Inter', system-ui, sans-serif",
+                size: 12,
+                weight: '500'
+              },
+              color: 'rgb(226, 232, 240)' // slate-200
+            }
           },
           tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            titleFont: {
+              family: "'Inter', system-ui, sans-serif",
+              size: 12,
+              weight: '600'
+            },
+            bodyFont: {
+              family: "'Inter', system-ui, sans-serif",
+              size: 12,
+              weight: '400'
+            },
+            padding: 12,
+            cornerRadius: 8,
+            boxPadding: 4,
+            borderColor: 'rgba(51, 65, 85, 0.5)',
+            borderWidth: 1,
+            displayColors: false,
             callbacks: {
-              title: (items) => {
-                if (items.length > 0) {
-                  const index = items[0].dataIndex;
-                  return formatTime(data[index].timestamp);
-                }
-                return '';
+              title: (tooltipItems) => {
+                return tooltipItems[0].label;
+              },
+              label: (context) => {
+                const value = context.parsed.y;
+                if (value === null) return '';
+                return `${context.dataset.label}: ${value.toFixed(1)} ${yLabel.replace('(', '').replace(')', '')}`;
               }
             }
           }
         },
         scales: {
           x: {
-            display: true,
-            title: {
+            grid: {
               display: true,
-              text: 'Time'
+              color: 'rgba(51, 65, 85, 0.1)',
+              tickLength: 0
             },
             ticks: {
-              maxRotation: 45,
-              minRotation: 45
+              maxRotation: 0,
+              font: {
+                family: "'Inter', system-ui, sans-serif",
+                size: 11
+              },
+              color: 'rgb(148, 163, 184)', // slate-400
+              maxTicksLimit: 8,
+              callback: function(value, index, values) {
+                const label = this.getLabelForValue(value as number);
+                return label.split(',')[0]; // Show only date, not time
+              }
+            },
+            border: {
+              color: 'rgba(51, 65, 85, 0.2)'
             }
           },
           y: {
-            display: true,
+            grid: {
+              display: true,
+              color: 'rgba(51, 65, 85, 0.1)',
+              tickLength: 0
+            },
+            border: {
+              color: 'rgba(51, 65, 85, 0.2)'
+            },
+            ticks: {
+              font: {
+                family: "'Inter', system-ui, sans-serif",
+                size: 11
+              },
+              color: 'rgb(148, 163, 184)', // slate-400
+              padding: 8,
+              maxTicksLimit: 6
+            },
             title: {
               display: true,
-              text: yLabel
+              text: yLabel,
+              font: {
+                family: "'Inter', system-ui, sans-serif",
+                size: 12,
+                weight: '500'
+              },
+              color: 'rgb(148, 163, 184)', // slate-400
+              padding: {
+                bottom: 8
+              }
             }
+          }
+        },
+        layout: {
+          padding: {
+            top: 8,
+            right: 8,
+            bottom: 8,
+            left: 8
           }
         }
       }

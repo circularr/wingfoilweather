@@ -5,6 +5,7 @@ import { fetchHistoricalWeather } from '../../lib/weather';
 import { trainModel, predictNextHours } from './model';
 import type { WeatherData, PredictionChunk, PerformancePreset, TrainingProgress } from './types';
 import { PerformanceControls } from './PerformanceControls';
+import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 import './styles.css';
 
 export function WeatherPredictor() {
@@ -112,7 +113,7 @@ export function WeatherPredictor() {
                   <button
                     onClick={resetLocation}
                     className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
-                      bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white
+                      bg-gray-800 text-gray-100 hover:bg-gray-700 hover:text-white
                       border border-gray-700/50 hover:border-gray-600
                       flex items-center gap-2"
                   >
@@ -126,46 +127,18 @@ export function WeatherPredictor() {
                 )}
               </div>
               
-              <div className="text-gray-300 space-y-4 mb-8">
+              <div className="text-gray-100 space-y-4 mb-8">
                 <p className="text-sm leading-relaxed">
                   Fine-tune your prediction accuracy and speed. Choose between quick results 
                   for exploration or detailed analysis for precise planning.
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  {[
-                    {
-                      mode: 'Fast',
-                      icon: '⚡',
-                      desc: 'Quick results, perfect for exploring different locations'
-                    },
-                    {
-                      mode: 'Balanced',
-                      icon: '⚖️',
-                      desc: 'Optimal mix of speed and prediction accuracy'
-                    },
-                    {
-                      mode: 'Accurate',
-                      icon: '🎯',
-                      desc: 'Highest precision, recommended for detailed planning'
-                    }
-                  ].map(({ mode, icon, desc }) => (
-                    <div key={mode} className="flex gap-3 p-4 rounded-xl bg-gray-800/50">
-                      <span className="text-xl">{icon}</span>
-                      <div>
-                        <h3 className="font-medium text-white">{mode}</h3>
-                        <p className="text-gray-400 text-sm mt-1">{desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <PerformanceControls
+                  performancePreset={performancePreset}
+                  useLightModel={useLightModel}
+                  onPresetChange={setPerformancePreset}
+                  onModelTypeChange={setUseLightModel}
+                />
               </div>
-              
-              <PerformanceControls
-                performancePreset={performancePreset}
-                useLightModel={useLightModel}
-                onPresetChange={setPerformancePreset}
-                onModelTypeChange={setUseLightModel}
-              />
             </div>
           </div>
         </div>
@@ -175,12 +148,45 @@ export function WeatherPredictor() {
         </div>
         
         {error && (
-          <div className="mb-8 rounded-xl p-4 bg-red-500/10 border border-red-500/20">
-            <div className="flex gap-3 items-center text-red-400">
+          <div className="mb-8 rounded-xl p-4 bg-red-950/50 border border-red-500/30">
+            <div className="flex gap-3 items-center text-red-200">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>{error}</span>
+              <span className="font-medium">{error}</span>
+            </div>
+          </div>
+        )}
+
+        {selectedLocation && !isLoading && predictions.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-8">
+              <div className="space-y-6">
+                <div className="flex flex-col space-y-4">
+                  <h3 className="text-xl font-semibold text-white">Weather Data Analysis</h3>
+                  <div className="grid gap-3 bg-slate-900 p-4 rounded-xl border border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-400 ring-4 ring-blue-400/10"></div>
+                      <span className="text-blue-100 font-medium">Historical Data</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 ring-4 ring-indigo-400/10"></div>
+                      <span className="text-indigo-100 font-medium">OpenMeteo Forecast</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-violet-400 ring-4 ring-violet-400/10"></div>
+                      <span className="text-violet-100 font-medium">AI Prediction</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Wind Table Component */}
+                <WindTable 
+                  historicalData={historicalData}
+                  forecastData={forecastData}
+                  predictions={predictions}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -190,22 +196,23 @@ export function WeatherPredictor() {
             <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-8">
               <div className="space-y-6">
                 <div className="flex flex-col space-y-4">
-                  <h3 className="text-xl font-semibold text-white/95">Complete Weather Data Analysis</h3>
-                  <div className="grid gap-3 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
-                    <div className="flex items-center gap-3 text-white/90 font-medium">
-                      <div className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-lg shadow-blue-400/20"></div>
-                      Historical Data
+                  <h3 className="text-xl font-semibold text-white">Analysis Progress</h3>
+                  <div className="grid gap-3 bg-slate-900 p-4 rounded-xl border border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-400 ring-4 ring-blue-400/10"></div>
+                      <span className="text-blue-100 font-medium">Historical Data</span>
                     </div>
-                    <div className="flex items-center gap-3 text-white/90 font-medium">
-                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-lg shadow-indigo-400/20"></div>
-                      OpenMeteo Forecast
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 ring-4 ring-indigo-400/10"></div>
+                      <span className="text-indigo-100 font-medium">OpenMeteo Forecast</span>
                     </div>
-                    <div className="flex items-center gap-3 text-white/90 font-medium">
-                      <div className="w-2.5 h-2.5 rounded-full bg-violet-400 shadow-lg shadow-violet-400/20"></div>
-                      AI Prediction
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-violet-400 ring-4 ring-violet-400/10"></div>
+                      <span className="text-violet-100 font-medium">AI Prediction</span>
                     </div>
                   </div>
                 </div>
+                
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="font-medium text-white">
@@ -215,9 +222,9 @@ export function WeatherPredictor() {
                       {!progress && 'Preparing analysis...'}
                     </div>
                     {progress?.stage === 'training' && progress.loss !== undefined && (
-                      <div className="flex items-center gap-3 bg-slate-800 px-4 py-2.5 rounded-xl border border-slate-600 shadow-lg">
+                      <div className="flex items-center gap-3 bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-700 shadow-lg">
                         <div className="flex flex-col">
-                          <span className="text-xs uppercase tracking-wider text-slate-300">Loss</span>
+                          <span className="text-xs uppercase tracking-wider text-slate-100">Loss</span>
                           <span className="font-mono text-lg text-white tabular-nums transition-all duration-1000">
                             {smoothedLoss.toFixed(4)}
                           </span>
@@ -225,14 +232,11 @@ export function WeatherPredictor() {
                       </div>
                     )}
                   </div>
-                  <div className="text-sm bg-slate-800 px-4 py-2.5 rounded-xl border border-slate-600 text-white font-medium shadow-lg">
-                    {useLightModel ? 'Optimized' : 'Standard'} • {performancePreset}
-                  </div>
                 </div>
                 
                 {/* Progress bar with smooth animation */}
                 <div className="relative">
-                  <div className="overflow-hidden h-2.5 rounded-full bg-slate-800 border border-slate-700">
+                  <div className="overflow-hidden h-2.5 rounded-full bg-slate-900 border border-slate-700">
                     <div 
                       className="h-full bg-gradient-to-r from-blue-400 to-indigo-400 transition-all duration-300 ease-out relative"
                       style={{
@@ -245,16 +249,6 @@ export function WeatherPredictor() {
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {!isLoading && selectedLocation && historicalData.length > 0 && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900/50 backdrop-blur-xl overflow-hidden">
-            <WindTable 
-              historicalData={historicalData}
-              forecastData={forecastData}
-              predictions={predictions}
-            />
           </div>
         )}
       </div>
