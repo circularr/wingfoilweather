@@ -1,27 +1,24 @@
 #!/bin/bash
 
-OUTPUT_FILE="concatenated_source.txt"
+OUTPUT_FILE="src_files.txt"
 echo "" > $OUTPUT_FILE
 
 # Function to add a file to our output
 add_file() {
     local filepath=$1
-    local relpath=${filepath#/Users/paul/weatherhero/}
+    local relpath=${filepath#/Users/paul/Documents/tensor/wingfoilweather/}
     
-    echo "=======================================" >> $OUTPUT_FILE
-    echo "File: $relpath" >> $OUTPUT_FILE
-    echo "=======================================" >> $OUTPUT_FILE
+    echo "=== START FILE: $relpath ===" >> $OUTPUT_FILE
     echo "" >> $OUTPUT_FILE
     cat "$filepath" >> $OUTPUT_FILE
+    echo "" >> $OUTPUT_FILE
+    echo "=== END FILE: $relpath ===" >> $OUTPUT_FILE
     echo "" >> $OUTPUT_FILE
     echo "" >> $OUTPUT_FILE
 }
 
-# Add root HTML file
-add_file "/Users/paul/weatherhero/index.html"
-
-# Add all source files
-find "/Users/paul/weatherhero/src" -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.html" -o -name "*.css" \) | while read file; do
+# Add all source files recursively
+find "/Users/paul/Documents/tensor/wingfoilweather/src" -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.css" \) | sort | while read file; do
     add_file "$file"
 done
 

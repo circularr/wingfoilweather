@@ -21,8 +21,8 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
   const [errorChart, setErrorChart] = useState<Chart | null>(null);
   const [scatterChart, setScatterChart] = useState<Chart | null>(null);
 
+  // Cleanup charts on unmount
   useEffect(() => {
-    // Cleanup function
     return () => {
       if (fitChart) fitChart.destroy();
       if (errorChart) errorChart.destroy();
@@ -30,6 +30,7 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
     };
   }, []);
 
+  // Update charts when metrics change or tab is switched
   useEffect(() => {
     if (!isExpanded || activeTab !== 'analysis') return;
 
@@ -39,13 +40,14 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
     if (scatterChart) scatterChart.destroy();
 
     // Create training progress chart
-    if (fitChartRef.current) {
+    if (fitChartRef.current && metrics.trainingLoss.length > 0) {
       const ctx = fitChartRef.current.getContext('2d');
       if (ctx) {
+        const epochs = Array.from({ length: metrics.trainingLoss.length }, (_, i) => i + 1);
         const newChart = new Chart(ctx, {
           type: 'line',
           data: {
-            labels: Array.from({ length: metrics.trainingLoss.length }, (_, i) => i + 1),
+            labels: epochs,
             datasets: [
               {
                 label: 'Training Loss',
@@ -53,7 +55,7 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                 borderColor: '#818cf8',
                 backgroundColor: 'rgba(129, 140, 248, 0.1)',
                 fill: true,
-                pointRadius: 4,
+                pointRadius: 2,
                 pointBackgroundColor: '#818cf8',
                 pointBorderColor: '#ffffff',
                 pointBorderWidth: 1,
@@ -65,7 +67,7 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                 borderColor: '#34d399',
                 backgroundColor: 'rgba(52, 211, 153, 0.1)',
                 fill: true,
-                pointRadius: 4,
+                pointRadius: 2,
                 pointBackgroundColor: '#34d399',
                 pointBorderColor: '#ffffff',
                 pointBorderWidth: 1,
@@ -76,6 +78,9 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+              duration: 0
+            },
             plugins: {
               title: {
                 display: true,
@@ -89,7 +94,23 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                   usePointStyle: true,
                   pointStyle: 'circle'
                 }
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                titleColor: '#e5e7eb',
+                bodyColor: '#e5e7eb',
+                borderColor: 'rgba(75, 85, 99, 0.3)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 4
               }
+            },
+            interaction: {
+              mode: 'nearest',
+              axis: 'x',
+              intersect: false
             },
             scales: {
               x: {
@@ -99,7 +120,14 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                   color: '#e5e7eb'
                 },
                 ticks: { color: '#e5e7eb' },
-                grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                grid: { 
+                  color: 'rgba(75, 85, 99, 0.2)',
+                  lineWidth: 1,
+                  display: true
+                },
+                border: {
+                  display: false
+                }
               },
               y: {
                 title: {
@@ -108,7 +136,15 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                   color: '#e5e7eb'
                 },
                 ticks: { color: '#e5e7eb' },
-                grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                grid: { 
+                  color: 'rgba(75, 85, 99, 0.2)',
+                  lineWidth: 1,
+                  display: true
+                },
+                border: {
+                  display: false
+                },
+                min: 0
               }
             }
           }
@@ -117,30 +153,37 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
       }
     }
 
-    // Create scatter plot for underfitting/overfitting visualization
-    if (scatterChartRef.current) {
+    // Create scatter plot for model fit analysis
+    if (scatterChartRef.current && metrics.trainingLoss.length > 0) {
       const ctx = scatterChartRef.current.getContext('2d');
       if (ctx) {
-        // Generate some sample predicted vs actual data points
-        const predictedVsActual = metrics.trainingLoss.map((_, i) => ({
-          x: metrics.trainingLoss[i],
-          y: metrics.validationLoss[i]
+        const scatterData = metrics.trainingLoss.map((loss, i) => ({
+          x: loss,
+          y: metrics.validationLoss[i] || 0
         }));
+
+        const maxLoss = Math.max(
+          ...metrics.trainingLoss,
+          ...metrics.validationLoss.filter(Boolean)
+        );
 
         const newChart = new Chart(ctx, {
           type: 'scatter',
           data: {
             datasets: [{
-              label: 'Model Fit',
-              data: predictedVsActual,
+              label: 'Training vs Validation Loss',
+              data: scatterData,
               backgroundColor: '#818cf8',
-              pointRadius: 6,
-              pointHoverRadius: 8
+              pointRadius: 4,
+              pointHoverRadius: 6
             }]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+              duration: 0
+            },
             plugins: {
               title: {
                 display: true,
@@ -148,55 +191,18 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                 color: '#e5e7eb',
                 font: { size: 14, weight: 'bold' }
               },
-              annotation: {
-                annotations: {
-                  line1: {
-                    type: 'line',
-                    xMin: 0,
-                    xMax: Math.max(...metrics.trainingLoss),
-                    yMin: 0,
-                    yMax: Math.max(...metrics.trainingLoss),
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    borderWidth: 2,
-                    borderDash: [6, 6],
-                    label: {
-                      content: 'Perfect Fit',
-                      display: true,
-                      color: '#e5e7eb',
-                      position: 'start'
-                    }
-                  },
-                  underfitRegion: {
-                    type: 'box',
-                    xMin: Math.min(...metrics.trainingLoss),
-                    xMax: Math.max(...metrics.trainingLoss) * 0.4,
-                    yMin: Math.min(...metrics.validationLoss),
-                    yMax: Math.max(...metrics.validationLoss),
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    borderColor: 'rgba(239, 68, 68, 0.5)',
-                    borderWidth: 1,
-                    label: {
-                      content: 'Underfitting',
-                      display: true,
-                      color: 'rgba(239, 68, 68, 0.9)',
-                      position: 'start'
-                    }
-                  },
-                  overfitRegion: {
-                    type: 'box',
-                    xMin: Math.max(...metrics.trainingLoss) * 0.6,
-                    xMax: Math.max(...metrics.trainingLoss),
-                    yMin: Math.min(...metrics.validationLoss),
-                    yMax: Math.max(...metrics.validationLoss),
-                    backgroundColor: 'rgba(234, 179, 8, 0.1)',
-                    borderColor: 'rgba(234, 179, 8, 0.5)',
-                    borderWidth: 1,
-                    label: {
-                      content: 'Overfitting',
-                      display: true,
-                      color: 'rgba(234, 179, 8, 0.9)',
-                      position: 'end'
-                    }
+              tooltip: {
+                backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                titleColor: '#e5e7eb',
+                bodyColor: '#e5e7eb',
+                borderColor: 'rgba(75, 85, 99, 0.3)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 4,
+                callbacks: {
+                  label: (context: any) => {
+                    const point = context.raw;
+                    return `Training: ${point.x.toFixed(4)}, Validation: ${point.y.toFixed(4)}`;
                   }
                 }
               }
@@ -209,7 +215,16 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                   color: '#e5e7eb'
                 },
                 ticks: { color: '#e5e7eb' },
-                grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                grid: { 
+                  color: 'rgba(75, 85, 99, 0.2)',
+                  lineWidth: 1,
+                  display: true
+                },
+                border: {
+                  display: false
+                },
+                min: 0,
+                max: maxLoss * 1.1
               },
               y: {
                 title: {
@@ -218,7 +233,16 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                   color: '#e5e7eb'
                 },
                 ticks: { color: '#e5e7eb' },
-                grid: { color: 'rgba(75, 85, 99, 0.2)' }
+                grid: { 
+                  color: 'rgba(75, 85, 99, 0.2)',
+                  lineWidth: 1,
+                  display: true
+                },
+                border: {
+                  display: false
+                },
+                min: 0,
+                max: maxLoss * 1.1
               }
             }
           }
@@ -228,7 +252,7 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
     }
 
     // Create error distribution chart
-    if (errorChartRef.current) {
+    if (errorChartRef.current && metrics.errorDistribution.length > 0) {
       const ctx = errorChartRef.current.getContext('2d');
       if (ctx) {
         const newChart = new Chart(ctx, {
@@ -252,6 +276,9 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+              duration: 0
+            },
             plugins: {
               title: {
                 display: true,
@@ -259,24 +286,24 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                 color: '#e5e7eb',
                 font: { size: 14, weight: 'bold' }
               },
-              legend: { display: false },
+              legend: {
+                display: false
+              },
               tooltip: {
                 backgroundColor: 'rgba(17, 24, 39, 0.9)',
                 titleColor: '#e5e7eb',
                 bodyColor: '#e5e7eb',
                 borderColor: 'rgba(75, 85, 99, 0.3)',
                 borderWidth: 1,
-                padding: 10,
-                callbacks: {
-                  label: (context) => `Frequency: ${context.parsed.y.toFixed(1)}%`
-                }
+                padding: 12,
+                cornerRadius: 4
               }
             },
             scales: {
               x: {
                 title: {
                   display: true,
-                  text: 'Error Range (kts)',
+                  text: 'Error Range (m/s)',
                   color: '#e5e7eb'
                 },
                 ticks: { 
@@ -284,7 +311,10 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                   maxRotation: 45,
                   minRotation: 45
                 },
-                grid: {
+                grid: { 
+                  display: false
+                },
+                border: {
                   display: false
                 }
               },
@@ -294,13 +324,17 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                   text: 'Frequency (%)',
                   color: '#e5e7eb'
                 },
-                ticks: {
-                  color: '#e5e7eb',
-                  callback: (value) => `${value}%`
+                ticks: { color: '#e5e7eb' },
+                grid: { 
+                  color: 'rgba(75, 85, 99, 0.2)',
+                  lineWidth: 1,
+                  display: true
                 },
-                grid: {
-                  color: 'rgba(75, 85, 99, 0.2)'
-                }
+                border: {
+                  display: false
+                },
+                min: 0,
+                max: 100
               }
             }
           }
@@ -308,146 +342,98 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
         setErrorChart(newChart);
       }
     }
-  }, [isExpanded, activeTab, metrics]);
+  }, [metrics, isExpanded, activeTab]);
 
   return (
-    <div className="bg-gray-800/50 backdrop-blur rounded-lg border border-gray-700">
+    <div className="space-y-4">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 text-left"
+        className="w-full flex items-center justify-between p-4 bg-gray-800/50 rounded-xl hover:bg-gray-800/70 transition-colors"
       >
-        <div className="flex items-center space-x-3">
-          <AcademicCapIcon className="h-5 w-5 text-indigo-400" />
-          <div>
-            <h3 className="text-sm font-medium text-gray-200">Model Performance Metrics</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {isExpanded ? 'Click to collapse' : 'Click to view metrics and analysis'}
-            </p>
-          </div>
+        <div className="flex items-center gap-3">
+          <AcademicCapIcon className="w-5 h-5 text-indigo-400" />
+          <span className="font-medium text-white">Model Performance Metrics</span>
         </div>
         {isExpanded ? (
-          <ChevronUpIcon className="h-5 w-5 text-gray-400" />
+          <ChevronUpIcon className="w-5 h-5 text-gray-400" />
         ) : (
-          <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+          <ChevronDownIcon className="w-5 h-5 text-gray-400" />
         )}
       </button>
 
       {isExpanded && (
-        <div className="px-4 pb-4">
-          <div className="border-t border-gray-700 pt-4">
-            <div className="flex space-x-4 mb-4">
-              <button
-                onClick={() => setActiveTab('metrics')}
-                className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                  activeTab === 'metrics'
-                    ? 'bg-indigo-500 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                }`}
-              >
-                Metrics
-              </button>
-              <button
-                onClick={() => setActiveTab('analysis')}
-                className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                  activeTab === 'analysis'
-                    ? 'bg-indigo-500 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                }`}
-              >
-                Analysis
-              </button>
-            </div>
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('metrics')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'metrics'
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              Key Metrics
+            </button>
+            <button
+              onClick={() => setActiveTab('analysis')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'analysis'
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              Detailed Analysis
+            </button>
+          </div>
 
-            {activeTab === 'metrics' ? (
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-300 mb-2">Error Metrics</h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-gray-800 rounded-md p-3 border border-gray-700">
-                      <p className="text-xs text-gray-400">RMSE</p>
-                      <p className="text-sm font-mono text-gray-200 mt-1">
-                        {metrics.rmse.toFixed(3)}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800 rounded-md p-3 border border-gray-700">
-                      <p className="text-xs text-gray-400">MAE</p>
-                      <p className="text-sm font-mono text-gray-200 mt-1">
-                        {metrics.mae.toFixed(3)}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800 rounded-md p-3 border border-gray-700">
-                      <p className="text-xs text-gray-400">R² Score</p>
-                      <p className="text-sm font-mono text-gray-200 mt-1">
-                        {metrics.r2Score.toFixed(3)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-medium text-gray-300 mb-2">95% Confidence Intervals (±)</h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-gray-800 rounded-md p-3 border border-gray-700">
-                      <p className="text-xs text-gray-400">Wind Speed</p>
-                      <p className="text-sm font-mono text-gray-200 mt-1">
-                        ±{metrics.confidenceIntervals.wind.toFixed(1)} kts
-                      </p>
-                    </div>
-                    <div className="bg-gray-800 rounded-md p-3 border border-gray-700">
-                      <p className="text-xs text-gray-400">Direction</p>
-                      <p className="text-sm font-mono text-gray-200 mt-1">
-                        ±{metrics.confidenceIntervals.direction.toFixed(1)}°
-                      </p>
-                    </div>
-                    <div className="bg-gray-800 rounded-md p-3 border border-gray-700">
-                      <p className="text-xs text-gray-400">Temperature</p>
-                      <p className="text-sm font-mono text-gray-200 mt-1">
-                        ±{metrics.confidenceIntervals.temperature.toFixed(1)}°C
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-700">
-                  <div>
-                    <p className="text-xs text-gray-400">Sample Size</p>
-                    <p className="text-sm font-mono text-gray-200 mt-1">
-                      {metrics.sampleSize.toLocaleString()} observations
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Generated At</p>
-                    <p className="text-sm font-mono text-gray-200 mt-1">
-                      {new Date(metrics.timestamp).toLocaleString()}
-                    </p>
-                  </div>
+          {activeTab === 'metrics' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gray-800/50 rounded-xl p-4">
+                <div className="text-sm text-gray-400">RMSE</div>
+                <div className="text-2xl font-semibold text-white mt-1">
+                  {metrics.rmse.toFixed(3)}
                 </div>
               </div>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-300 mb-3">Training Progress</h4>
-                  <div className="bg-gray-800 rounded-md p-4 border border-gray-700" style={{ height: '300px' }}>
-                    <canvas ref={fitChartRef} />
-                  </div>
+              <div className="bg-gray-800/50 rounded-xl p-4">
+                <div className="text-sm text-gray-400">MAE</div>
+                <div className="text-2xl font-semibold text-white mt-1">
+                  {metrics.mae.toFixed(3)}
                 </div>
-
-                <div>
-                  <h4 className="text-sm font-medium text-gray-300 mb-3">Model Fit Analysis</h4>
-                  <div className="bg-gray-800 rounded-md p-4 border border-gray-700" style={{ height: '300px' }}>
+              </div>
+              <div className="bg-gray-800/50 rounded-xl p-4">
+                <div className="text-sm text-gray-400">R² Score</div>
+                <div className="text-2xl font-semibold text-white mt-1">
+                  {metrics.r2Score.toFixed(3)}
+                </div>
+              </div>
+              <div className="bg-gray-800/50 rounded-xl p-4">
+                <div className="text-sm text-gray-400">Sample Size</div>
+                <div className="text-2xl font-semibold text-white mt-1">
+                  {metrics.sampleSize}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="bg-gray-800/50 rounded-xl p-4">
+                <div className="h-64">
+                  <canvas ref={fitChartRef} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-gray-800/50 rounded-xl p-4">
+                  <div className="h-64">
                     <canvas ref={scatterChartRef} />
                   </div>
                 </div>
-
-                <div>
-                  <h4 className="text-sm font-medium text-gray-300 mb-3">Error Distribution</h4>
-                  <div className="bg-gray-800 rounded-md p-4 border border-gray-700" style={{ height: '300px' }}>
+                <div className="bg-gray-800/50 rounded-xl p-4">
+                  <div className="h-64">
                     <canvas ref={errorChartRef} />
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

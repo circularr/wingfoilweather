@@ -31,10 +31,16 @@ export interface ModelConfig {
   epochs: number;
   batchSize: number;
   learningRate: number;
-  timeSteps: number; // 16 hours
-  predictionSteps: number; // 24 chunks of 4 hours
+  timeSteps: number;
+  predictionSteps: number;
   performancePreset: PerformancePreset;
   useLightModel: boolean;
+  callbacks?: {
+    onProgress?: (progress: TrainingProgress) => void;
+    onModelUpdate?: (model: any) => void;
+    onTrainingLoss?: (loss: number[]) => void;
+    onValidationLoss?: (loss: number[]) => void;
+  };
 }
 
 export interface ModelMetricsType {
@@ -65,9 +71,6 @@ export interface TrainingProgress {
   totalEpochs: number;
   loss: number;
   stage: 'initializing' | 'training' | 'predicting';
-}
-
-export interface TrainingProgress {
-  status: string;
-  progress: number;
+  status?: string;
+  progress?: number;
 }
