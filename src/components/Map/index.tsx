@@ -27,9 +27,9 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     
     mapRef.current = map;
 
-    // Custom map style with cooler blue ocean
-    L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>',
+    // Use OpenStreetMap tiles (free, no API key needed)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
       className: 'map-tiles'
     }).addTo(map);
@@ -106,7 +106,7 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     <div className="relative">
       <style jsx global>{`
         .map-tiles {
-          filter: saturate(0.85) brightness(0.9) hue-rotate(10deg);
+          filter: brightness(0.8) contrast(1.1);
         }
         .leaflet-container {
           background: #1a1b1e;
