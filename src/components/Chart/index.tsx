@@ -11,17 +11,19 @@ import {
   Title,
   Tooltip,
   Legend,
-  ChartType,
-  ChartData,
+  TimeScale,
   ChartOptions,
+  ChartData,
+  ChartType,
   TooltipItem,
   ScatterDataPoint,
-  TimeScale,
-  LineController,
-  BarController,
+  ChartTypeRegistry,
   ScatterController,
-  ChartTypeRegistry
+  LineController,
+  BarController
 } from 'chart.js';
+import type { DeepPartial } from 'chart.js/types/utils';
+import { enGB } from 'date-fns/locale';
 import 'chartjs-adapter-date-fns';
 
 ChartJS.register(
@@ -34,9 +36,9 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
+  ScatterController,
   LineController,
-  BarController,
-  ScatterController
+  BarController
 );
 
 type ChartDataPoint = {
@@ -61,6 +63,8 @@ interface ChartProps {
   isTimeSeries?: boolean;
   isBarChart?: boolean;
 }
+
+type ChartTypes = 'line' | 'bar' | 'scatter';
 
 export function Chart({
   data,
@@ -89,27 +93,15 @@ export function Chart({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const formatTime = (timestamp: number) => {
-      if (isTimeSeries) {
-        return new Date(timestamp).toLocaleString('en-GB', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
-      } else {
-        return timestamp.toString();
-      }
-    };
-
-    const datasets: ChartData<ChartType>['datasets'] = [];
+    const datasets: ChartData<ChartTypes>['datasets'] = [];
 
     if (data.some((d) => d.historical !== undefined)) {
       datasets.push({
-        type: 'line',
+        type: 'line' as const,
         label: historicalLabel ?? 'Historical Data',
-        data: data.map((d) => (d.historical !== undefined ? { x: d.timestamp, y: d.historical } : null)).filter(Boolean),
+        data: data
+          .filter((d): d is ChartDataPoint & { historical: number } => d.historical !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.historical })),
         borderColor: 'rgb(186, 230, 253)',
         backgroundColor: 'rgba(186, 230, 253, 0.1)',
         borderWidth: 1.5,
@@ -122,9 +114,11 @@ export function Chart({
 
     if (data.some((d) => d.forecast !== undefined)) {
       datasets.push({
-        type: 'line',
+        type: 'line' as const,
         label: forecastLabel,
-        data: data.map((d) => (d.forecast !== undefined ? { x: d.timestamp, y: d.forecast } : null)).filter(Boolean),
+        data: data
+          .filter((d): d is ChartDataPoint & { forecast: number } => d.forecast !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.forecast })),
         borderColor: 'rgb(165, 180, 252)',
         backgroundColor: 'rgba(165, 180, 252, 0.1)',
         borderWidth: 1.5,
@@ -137,9 +131,11 @@ export function Chart({
 
     if (data.some((d) => d.prediction !== undefined)) {
       datasets.push({
-        type: 'line',
+        type: 'line' as const,
         label: predictionLabel,
-        data: data.map((d) => (d.prediction !== undefined ? { x: d.timestamp, y: d.prediction } : null)).filter(Boolean),
+        data: data
+          .filter((d): d is ChartDataPoint & { prediction: number } => d.prediction !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.prediction })),
         borderColor: 'rgb(240, 171, 252)',
         backgroundColor: 'rgba(240, 171, 252, 0.1)',
         borderWidth: 1.5,
@@ -152,9 +148,11 @@ export function Chart({
 
     if (data.some((d) => d.training !== undefined)) {
       datasets.push({
-        type: 'line',
+        type: 'line' as const,
         label: historicalLabel ?? 'Training Loss',
-        data: data.map((d) => (d.training !== undefined ? { x: d.timestamp, y: d.training } : null)).filter(Boolean),
+        data: data
+          .filter((d): d is ChartDataPoint & { training: number } => d.training !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.training })),
         borderColor: 'rgb(129, 140, 248)',
         backgroundColor: 'rgba(129, 140, 248, 0.1)',
         borderWidth: 1.5,
@@ -167,9 +165,11 @@ export function Chart({
 
     if (data.some((d) => d.validation !== undefined)) {
       datasets.push({
-        type: 'line',
+        type: 'line' as const,
         label: forecastLabel ?? 'Validation Loss',
-        data: data.map((d) => (d.validation !== undefined ? { x: d.timestamp, y: d.validation } : null)).filter(Boolean),
+        data: data
+          .filter((d): d is ChartDataPoint & { validation: number } => d.validation !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.validation })),
         borderColor: 'rgb(99, 102, 241)',
         backgroundColor: 'rgba(99, 102, 241, 0.1)',
         borderWidth: 1.5,
@@ -182,9 +182,11 @@ export function Chart({
 
     if (data.some((d) => d.value !== undefined)) {
       datasets.push({
-        type: 'bar',
+        type: 'bar' as const,
         label: historicalLabel ?? 'Data',
-        data: data.map((d) => (d.value !== undefined ? { x: d.timestamp, y: d.value } : null)).filter(Boolean),
+        data: data
+          .filter((d): d is ChartDataPoint & { value: number } => d.value !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.value })),
         backgroundColor: 'rgba(99, 102, 241, 0.7)',
         borderWidth: 0
       });
@@ -192,11 +194,14 @@ export function Chart({
 
     if (data.some((d) => d.actual !== undefined && d.predicted !== undefined)) {
       datasets.push({
-        type: 'scatter',
+        type: 'scatter' as const,
         label: 'Predicted vs Actual',
         data: data
-          .filter((d) => d.actual !== undefined && d.predicted !== undefined)
-          .map((d) => ({ x: d.actual!, y: d.predicted! })),
+          .filter(
+            (d): d is ChartDataPoint & { actual: number; predicted: number } =>
+              d.actual !== undefined && d.predicted !== undefined
+          )
+          .map((d) => ({ x: d.actual, y: d.predicted })),
         borderColor: 'rgb(129, 140, 248)',
         backgroundColor: 'rgba(129, 140, 248, 0.5)',
         pointRadius: 3,
@@ -204,7 +209,7 @@ export function Chart({
       });
     }
 
-    const options: ChartOptions<ChartType> = {
+    const options: DeepPartial<ChartOptions<ChartTypes>> = {
       responsive: true,
       maintainAspectRatio: false,
       interaction: {
@@ -247,7 +252,7 @@ export function Chart({
           borderWidth: 1,
           displayColors: false,
           callbacks: {
-            title: (tooltipItems: TooltipItem<ChartType>[]) => {
+            title: (tooltipItems: TooltipItem<ChartTypes>[]) => {
               if (isTimeSeries) {
                 return new Date(tooltipItems[0].parsed.x).toLocaleString('en-GB', {
                   month: 'short',
@@ -259,7 +264,7 @@ export function Chart({
               }
               return tooltipItems[0].parsed.x.toString();
             },
-            label: (context: TooltipItem<ChartType>) => {
+            label: (context: TooltipItem<ChartTypes>) => {
               const value = context.parsed.y;
               if (value === null) return '';
               return `${context.dataset.label}: ${value.toFixed(2)} ${yLabel.replace('(', '').replace(')', '')}`;
@@ -270,6 +275,11 @@ export function Chart({
       scales: {
         x: {
           type: isTimeSeries ? 'time' : 'linear',
+          adapters: {
+            date: {
+              locale: enGB
+            }
+          },
           grid: {
             display: true,
             color: 'rgba(51, 65, 85, 0.1)',
@@ -324,12 +334,16 @@ export function Chart({
     };
 
     const config = {
-      type: isBarChart ? 'bar' : 'line',
+      type: (isBarChart ? 'bar' : 'line') as ChartTypes,
       data: { datasets },
       options
     };
 
-    chartRef.current = new ChartJS(ctx, config);
+    chartRef.current = new ChartJS(ctx, {
+      type: config.type,
+      data: config.data,
+      options: config.options
+    });
 
     return () => {
       if (chartRef.current) {
