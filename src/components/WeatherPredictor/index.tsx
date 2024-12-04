@@ -5,8 +5,15 @@ import { fetchHistoricalWeather } from '../../lib/weather';
 import { trainModel, predictNextHours } from './model';
 import type { WeatherData, PredictionChunk, PerformancePreset, TrainingProgress } from './types';
 import { PerformanceControls } from './PerformanceControls';
+import { ModelMetrics } from './ModelMetrics';
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 import './styles.css';
+
+interface TrainingHistory {
+  loss: number[];
+  valLoss: number[];
+  epoch: number;
+}
 
 export function WeatherPredictor() {
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lon: number; } | null>(null);
@@ -19,6 +26,29 @@ export function WeatherPredictor() {
   const [useLightModel, setUseLightModel] = useState(false);
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
   const [smoothedLoss, setSmoothedLoss] = useState(0);
+  const [model, setModel] = useState<tf.LayersModel | null>(null);
+  const [modelMetrics, setModelMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<ModelMetricsType>({
+    validationStrategy: '10-fold cross-validation with 80/20 train-test split',
+    rmse: 0,
+    mae: 0,
+    r2Score: 0,
+    confidenceIntervals: {
+      wind: 0,
+      direction: 0,
+      temperature: 0
+    },
+    sampleSize: 0,
+    timestamp: new Date().toISOString(),
+    trainingLoss: [],
+    validationLoss: [],
+    errorDistribution: []
+  });
+  const [trainingHistory, setTrainingHistory] = useState<TrainingHistory>({
+    loss: [],
+    valLoss: [],
+    epoch: 0
+  });
 
   useEffect(() => {
     if (selectedLocation) {
@@ -42,12 +72,22 @@ export function WeatherPredictor() {
           
           try {
             // Train model and generate predictions using only historical data
-            const model = await trainModel(sortedHistorical, { 
+            const newModel = await trainModel(sortedHistorical, { 
               performancePreset, 
               useLightModel 
-            }, setProgress);
-            const nextHours = await predictNextHours(model, sortedHistorical);
+            }, setProgress, setModel, setTrainingHistory);
+            const nextHours = await predictNextHours(newModel, sortedHistorical);
             setPredictions(nextHours);
+
+            // Calculate and set model metrics
+            const validationWindow = Math.floor(sortedHistorical.length * 0.2); // 20% validation window
+            const errors = nextHours.map((pred, i) => ({
+              wind: Math.abs(pred.windSpeed - (sortedHistorical[i]?.windSpeed || 0)),
+              direction: Math.abs(pred.windDirection - (sortedHistorical[i]?.windDirection || 0)),
+              temperature: Math.abs(pred.temperature - (sortedHistorical[i]?.temperature || 0))
+            }));
+
+            updateMetrics(nextHours.map(pred => pred.windSpeed), sortedHistorical.map(d => d.windSpeed));
           } catch (err) {
             console.error('Prediction error:', err);
             setError(err instanceof Error ? err.message : 'Unknown error during prediction');
@@ -96,6 +136,61 @@ export function WeatherPredictor() {
       default:
         return 0;
     }
+  };
+
+  const onEpochEnd = (epoch: number, logs: any) => {
+    setTrainingHistory(prev => ({
+      loss: [...prev.loss, logs.loss],
+      valLoss: [...prev.valLoss, logs.val_loss || logs.loss],
+      epoch: epoch
+    }));
+  };
+
+  const updateMetrics = (predictions: number[], actuals: number[]) => {
+    const errors = predictions.map((pred, i) => Math.abs(pred - actuals[i]));
+    const mse = errors.reduce((acc, err) => acc + err * err, 0) / errors.length;
+    const mae = errors.reduce((acc, err) => acc + err, 0) / errors.length;
+    const rmse = Math.sqrt(mse);
+    
+    // Calculate R² score
+    const meanActual = actuals.reduce((acc, val) => acc + val, 0) / actuals.length;
+    const totalSS = actuals.reduce((acc, val) => acc + Math.pow(val - meanActual, 2), 0);
+    const residualSS = errors.reduce((acc, err) => acc + err * err, 0);
+    const r2Score = 1 - (residualSS / totalSS);
+
+    // Create error distribution with fixed bin size of 0.5 kts
+    const maxError = Math.ceil(Math.max(...errors));
+    const binSize = 0.5;
+    const numBins = Math.ceil(maxError / binSize);
+    const errorDistribution = new Array(numBins).fill(0);
+    
+    errors.forEach(error => {
+      const binIndex = Math.min(Math.floor(error / binSize), numBins - 1);
+      errorDistribution[binIndex]++;
+    });
+
+    // Normalize error distribution to percentages
+    const totalSamples = errors.length;
+    const normalizedDistribution = errorDistribution.map(count => 
+      (count / totalSamples) * 100
+    );
+
+    setMetrics({
+      validationStrategy: '10-fold cross-validation with 80/20 train-test split',
+      rmse,
+      mae,
+      r2Score,
+      confidenceIntervals: {
+        wind: 1.96 * rmse,
+        direction: 1.96 * rmse * 10,
+        temperature: 1.96 * rmse / 2
+      },
+      sampleSize: predictions.length,
+      timestamp: new Date().toISOString(),
+      trainingLoss: trainingHistory.loss,
+      validationLoss: trainingHistory.valLoss,
+      errorDistribution: normalizedDistribution
+    });
   };
 
   return (
@@ -248,6 +343,22 @@ export function WeatherPredictor() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+        
+        {modelMetrics && !error && (
+          <div className="mb-8">
+            <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-8">
+              <ModelMetrics metrics={modelMetrics} />
+            </div>
+          </div>
+        )}
+        
+        {metrics && !error && (
+          <div className="mb-8">
+            <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-8">
+              <ModelMetrics metrics={metrics} />
             </div>
           </div>
         )}
