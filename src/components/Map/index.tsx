@@ -29,9 +29,10 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     
     mapRef.current = map;
 
-    // Use Thunderforest Outdoors style (less road/town detail)
-    L.tileLayer('https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=6170aad10dfd42a38d4d8c709a536f38', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    // Use Carto Dark Matter style (completely free, no API key needed)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
       maxZoom: 19,
       className: 'map-tiles'
     }).addTo(map);
