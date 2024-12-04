@@ -15,21 +15,28 @@ export async function fetchHistoricalWeather(lat: number, lon: number, hours: nu
     
     console.log('Requesting data for date range:', { startDateStr, endDateStr });
 
+    // Use a CORS proxy to avoid CORS issues
+    const proxyUrl = 'https://corsproxy.io/?';
+
     // First, get weather data from regular API
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?` +
+    const weatherUrl = proxyUrl + encodeURIComponent(
+      `https://api.open-meteo.com/v1/forecast?` +
       `latitude=${lat}&longitude=${lon}&` +
       `hourly=temperature_2m,relative_humidity_2m,windspeed_10m,winddirection_10m,windgusts_10m&` +
       `past_days=${Math.ceil(hours/24)}&` +
       `forecast_days=2&` +
-      `timezone=auto`;
+      `timezone=auto`
+    );
 
     // Second, get marine data from marine API
-    const marineUrl = `https://marine-api.open-meteo.com/v1/marine?` +
+    const marineUrl = proxyUrl + encodeURIComponent(
+      `https://marine-api.open-meteo.com/v1/marine?` +
       `latitude=${lat}&longitude=${lon}&` +
       `hourly=wave_height,wave_period,wave_direction&` +
       `past_days=${Math.ceil(hours/24)}&` +
       `forecast_days=2&` +
-      `timezone=auto`;
+      `timezone=auto`
+    );
 
     console.log('Fetching from URLs:', { weatherUrl, marineUrl });
     
