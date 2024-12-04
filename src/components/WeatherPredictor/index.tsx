@@ -44,11 +44,8 @@ export function WeatherPredictor() {
     validationLoss: [],
     errorDistribution: []
   });
-  const [trainingHistory, setTrainingHistory] = useState<TrainingHistory>({
-    loss: [],
-    valLoss: [],
-    epoch: 0
-  });
+  const [trainingLoss, setTrainingLoss] = useState<number[]>([]);
+  const [validationLoss, setValidationLoss] = useState<number[]>([]);
 
   useEffect(() => {
     if (selectedLocation) {
@@ -75,7 +72,7 @@ export function WeatherPredictor() {
             const newModel = await trainModel(sortedHistorical, { 
               performancePreset, 
               useLightModel 
-            }, setProgress, setModel, setTrainingHistory);
+            }, setProgress, setModel, setTrainingLoss, setValidationLoss);
             const nextHours = await predictNextHours(newModel, sortedHistorical);
             setPredictions(nextHours);
 
@@ -138,14 +135,6 @@ export function WeatherPredictor() {
     }
   };
 
-  const onEpochEnd = (epoch: number, logs: any) => {
-    setTrainingHistory(prev => ({
-      loss: [...prev.loss, logs.loss],
-      valLoss: [...prev.valLoss, logs.val_loss || logs.loss],
-      epoch: epoch
-    }));
-  };
-
   const updateMetrics = (predictions: number[], actuals: number[]) => {
     const errors = predictions.map((pred, i) => Math.abs(pred - actuals[i]));
     const mse = errors.reduce((acc, err) => acc + err * err, 0) / errors.length;
@@ -187,8 +176,8 @@ export function WeatherPredictor() {
       },
       sampleSize: predictions.length,
       timestamp: new Date().toISOString(),
-      trainingLoss: trainingHistory.loss,
-      validationLoss: trainingHistory.valLoss,
+      trainingLoss,
+      validationLoss,
       errorDistribution: normalizedDistribution
     });
   };

@@ -37,6 +37,23 @@ export interface ModelConfig {
   useLightModel: boolean;
 }
 
+export interface ModelMetricsType {
+  validationStrategy: string;
+  rmse: number;
+  mae: number;
+  r2Score: number;
+  confidenceIntervals: {
+    wind: number;
+    direction: number;
+    temperature: number;
+  };
+  sampleSize: number;
+  timestamp: string;
+  trainingLoss: number[];
+  validationLoss: number[];
+  errorDistribution: number[];
+}
+
 export interface TrainingStatus {
   epoch: number;
   loss: number;
@@ -48,4 +65,9 @@ export interface TrainingProgress {
   totalEpochs: number;
   loss: number;
   stage: 'initializing' | 'training' | 'predicting';
+}
+
+export interface TrainingProgress {
+  status: string;
+  progress: number;
 }
