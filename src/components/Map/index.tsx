@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-control-geocoder';
+import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
 
 interface MapProps {
   onLocationSelect: (lat: number, lon: number) => void;
@@ -27,8 +29,8 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     
     mapRef.current = map;
 
-    // Use OpenStreetMap tiles (free, no API key needed)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Use Thunderforest Outdoors style (less road/town detail)
+    L.tileLayer('https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=6170aad10dfd42a38d4d8c709a536f38', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
       className: 'map-tiles'
@@ -38,6 +40,19 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     L.control.zoom({
       position: 'topright'
     }).addTo(map);
+
+    // Add search control (Nominatim - free OpenStreetMap search)
+    const geocoder = (L.Control as any).geocoder({
+      defaultMarkGeocode: false,
+      position: 'topleft',
+      placeholder: 'Search location...',
+      geocoder: new (L.Control as any).Geocoder.Nominatim()
+    }).addTo(map);
+
+    geocoder.on('markgeocode', function(e: any) {
+      const { center } = e.geocode;
+      onLocationSelect(center.lat, center.lng);
+    });
 
     // Set bounds to Devon and Cornwall region
     const southWest = L.latLng(49.8, -6.5);
@@ -106,18 +121,43 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     <div className="relative">
       <style jsx global>{`
         .map-tiles {
-          filter: brightness(0.8) contrast(1.1);
+          filter: brightness(0.85) contrast(1.1);
         }
         .leaflet-container {
           background: #1a1b1e;
         }
-        .leaflet-control-zoom a {
+        .leaflet-control-zoom a,
+        .leaflet-control-geocoder-form input {
           background-color: rgba(255, 255, 255, 0.1) !important;
           border: 1px solid rgba(255, 255, 255, 0.2) !important;
           color: white !important;
         }
-        .leaflet-control-zoom a:hover {
+        .leaflet-control-zoom a:hover,
+        .leaflet-control-geocoder-form input:focus {
           background-color: rgba(255, 255, 255, 0.2) !important;
+        }
+        .leaflet-control-geocoder {
+          background: transparent !important;
+          border: none !important;
+        }
+        .leaflet-control-geocoder-form input {
+          width: 200px;
+          padding: 5px 10px;
+          border-radius: 4px;
+          outline: none;
+        }
+        .leaflet-control-geocoder-alternatives {
+          background: #1a1b1e !important;
+          border: 1px solid rgba(255, 255, 255, 0.2) !important;
+          border-radius: 4px;
+          margin-top: 5px;
+        }
+        .leaflet-control-geocoder-alternatives a {
+          color: white !important;
+          padding: 5px 10px;
+        }
+        .leaflet-control-geocoder-alternatives a:hover {
+          background-color: rgba(255, 255, 255, 0.1) !important;
         }
         .custom-marker {
           filter: drop-shadow(0 0 10px rgba(79, 70, 229, 0.3));
