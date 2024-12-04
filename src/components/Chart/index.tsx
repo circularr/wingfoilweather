@@ -26,16 +26,18 @@ ChartJS.register(
 interface ChartProps {
   data: Array<{
     timestamp: number;
+    historical?: number;
     forecast?: number;
     prediction?: number;
   }>;
   yLabel: string;
+  historicalLabel?: string;
   forecastLabel: string;
   predictionLabel: string;
   id: string;
 }
 
-export function Chart({ data, yLabel, forecastLabel, predictionLabel, id }: ChartProps) {
+export function Chart({ data, yLabel, historicalLabel, forecastLabel, predictionLabel, id }: ChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
 
@@ -63,38 +65,63 @@ export function Chart({ data, yLabel, forecastLabel, predictionLabel, id }: Char
     };
 
     // Transform undefined values to null for Chart.js
+    const historicalData = data.map(d => d.historical ?? null);
     const forecastData = data.map(d => d.forecast ?? null);
     const predictionData = data.map(d => d.prediction ?? null);
+
+    const datasets = [];
+
+    // Add historical data if available
+    if (historicalData.some(d => d !== null)) {
+      datasets.push({
+        label: historicalLabel ?? 'Historical Data',
+        data: historicalData,
+        borderColor: 'rgb(186 230 253)', // text-sky-200
+        backgroundColor: 'rgba(186, 230, 253, 0.1)',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.4,
+        fill: false
+      });
+    }
+
+    // Add forecast data if available
+    if (forecastData.some(d => d !== null)) {
+      datasets.push({
+        label: forecastLabel,
+        data: forecastData,
+        borderColor: 'rgb(165 180 252)',  // text-indigo-300
+        backgroundColor: 'rgba(165, 180, 252, 0.1)',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.4,
+        fill: false
+      });
+    }
+
+    // Add prediction data if available
+    if (predictionData.some(d => d !== null)) {
+      datasets.push({
+        label: predictionLabel,
+        data: predictionData,
+        borderColor: 'rgb(240 171 252)',  // text-fuchsia-300
+        backgroundColor: 'rgba(240, 171, 252, 0.1)',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.4,
+        fill: false
+      });
+    }
 
     // Create new chart instance
     chartRef.current = new ChartJS(ctx, {
       type: 'line',
       data: {
         labels: data.map(d => formatTime(d.timestamp)),
-        datasets: [
-          {
-            label: forecastLabel,
-            data: forecastData,
-            borderColor: 'rgb(165 180 252)',  // text-indigo-300
-            backgroundColor: 'rgba(165 180 252, 0.1)',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            tension: 0.4,
-            fill: false
-          },
-          {
-            label: predictionLabel,
-            data: predictionData,
-            borderColor: 'rgb(240 171 252)',  // text-fuchsia-300
-            backgroundColor: 'rgba(240 171 252, 0.1)',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            tension: 0.4,
-            fill: false
-          }
-        ]
+        datasets: datasets
       },
       options: {
         responsive: true,
@@ -225,7 +252,7 @@ export function Chart({ data, yLabel, forecastLabel, predictionLabel, id }: Char
         chartRef.current = null;
       }
     };
-  }, [data, yLabel, forecastLabel, predictionLabel, id]);
+  }, [data, yLabel, historicalLabel, forecastLabel, predictionLabel, id]);
 
   return (
     <div style={{ height: '300px', width: '100%' }}>

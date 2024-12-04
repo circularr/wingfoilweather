@@ -43,6 +43,9 @@ export class WeatherModel {
   private config: ModelConfig;
   private static modelCache: { [key: string]: tf.LayersModel } = {};
 
+  private trainingLoss: number[] = [];
+  private validationLoss: number[] = [];
+
   constructor(config: Partial<ModelConfig> = {}) {
     // If a preset is provided, use its values as base
     const baseConfig = config.performancePreset 
@@ -197,6 +200,14 @@ export class WeatherModel {
                   loss: logs?.loss || 0,
                   stage: 'training'
                 });
+
+                // Collect training loss and validation loss
+                if (logs && logs.loss !== undefined && logs.val_loss !== undefined) {
+                  this.trainingLoss.push(logs.loss);
+                  this.validationLoss.push(logs.val_loss);
+                  this.config.callbacks?.onTrainingLoss?.(logs.loss);
+                  this.config.callbacks?.onValidationLoss?.(logs.val_loss);
+                }
               },
               onTrainEnd: () => {
                 resolve();

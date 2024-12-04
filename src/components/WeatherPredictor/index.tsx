@@ -91,21 +91,21 @@ export function WeatherPredictor() {
                 },
                 onModelUpdate: setModel,
                 onTrainingLoss: (loss) => {
-                  newTrainingLoss.push(...loss);
-                  setTrainingLoss(newTrainingLoss);
+                  newTrainingLoss.push(loss);
+                  setTrainingLoss([...newTrainingLoss]);
                   // Update metrics immediately with new loss data
                   setMetrics(prev => ({
                     ...prev,
-                    trainingLoss: newTrainingLoss
+                    trainingLoss: [...newTrainingLoss]
                   }));
                 },
                 onValidationLoss: (loss) => {
-                  newValidationLoss.push(...loss);
-                  setValidationLoss(newValidationLoss);
+                  newValidationLoss.push(loss);
+                  setValidationLoss([...newValidationLoss]);
                   // Update metrics immediately with new validation data
                   setMetrics(prev => ({
                     ...prev,
-                    validationLoss: newValidationLoss
+                    validationLoss: [...newValidationLoss]
                   }));
                 }
               }
@@ -115,37 +115,25 @@ export function WeatherPredictor() {
             setPredictions(nextHours);
 
             // Calculate final metrics
-            const errors = nextHours.map((pred, i) => 
-              Math.abs(pred.windSpeed - (sortedHistorical[i]?.windSpeed || 0))
-            );
+            // Since we don't have actual future data, we can compute errors on validation data
+            const errors = newValidationLoss.map((valLoss) => Math.sqrt(valLoss));
 
             const mse = errors.reduce((acc, err) => acc + err * err, 0) / errors.length;
             const mae = errors.reduce((acc, err) => acc + err, 0) / errors.length;
             const rmse = Math.sqrt(mse);
 
-            // Calculate R² score
-            const meanActual = sortedHistorical.reduce((acc, val) => acc + val.windSpeed, 0) / sortedHistorical.length;
-            const totalSS = sortedHistorical.reduce((acc, val) => acc + Math.pow(val.windSpeed - meanActual, 2), 0);
-            const residualSS = errors.reduce((acc, err) => acc + err * err, 0);
-            const r2Score = 1 - (residualSS / totalSS);
+            // Since we don't have actual R² calculation without true values, we'll set it to NaN
+            const r2Score = NaN;
 
             // Update metrics with all data
-            setMetrics({
-              validationStrategy: '10-fold cross-validation with 80/20 train-test split',
+            setMetrics(prevMetrics => ({
+              ...prevMetrics,
               rmse,
               mae,
               r2Score,
-              confidenceIntervals: {
-                wind: 1.96 * rmse,
-                direction: 1.96 * rmse * 10,
-                temperature: 1.96 * rmse / 2
-              },
               sampleSize: sortedHistorical.length,
-              timestamp: new Date().toISOString(),
-              trainingLoss: newTrainingLoss,
-              validationLoss: newValidationLoss,
               errorDistribution: calculateErrorDistribution(errors)
-            });
+            }));
 
           } catch (err) {
             console.error('Prediction error:', err);
