@@ -17,6 +17,7 @@ export function WeatherPredictor() {
   const [performancePreset, setPerformancePreset] = useState<PerformancePreset>('balanced');
   const [useLightModel, setUseLightModel] = useState(false);
   const [progress, setProgress] = useState<TrainingProgress | null>(null);
+  const [smoothedLoss, setSmoothedLoss] = useState(0);
 
   useEffect(() => {
     if (selectedLocation) {
@@ -61,6 +62,15 @@ export function WeatherPredictor() {
         });
     }
   }, [selectedLocation, performancePreset, useLightModel]);
+
+  useEffect(() => {
+    if (progress?.loss !== undefined) {
+      setSmoothedLoss(prev => {
+        const alpha = 0.1; // Smoothing factor
+        return prev * (1 - alpha) + progress.loss * alpha;
+      });
+    }
+  }, [progress?.loss]);
 
   const handleLocationSelect = (lat: number, lon: number) => {
     setSelectedLocation({ lat, lon });
@@ -179,38 +189,57 @@ export function WeatherPredictor() {
           <div className="mb-8">
             <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-8">
               <div className="space-y-6">
-                <div className="flex items-center justify-between text-gray-200">
+                <div className="flex flex-col space-y-4">
+                  <h3 className="text-xl font-semibold text-white/95">Complete Weather Data Analysis</h3>
+                  <div className="grid gap-3 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+                    <div className="flex items-center gap-3 text-white/90 font-medium">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-lg shadow-blue-400/20"></div>
+                      Historical Data
+                    </div>
+                    <div className="flex items-center gap-3 text-white/90 font-medium">
+                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-lg shadow-indigo-400/20"></div>
+                      OpenMeteo Forecast
+                    </div>
+                    <div className="flex items-center gap-3 text-white/90 font-medium">
+                      <div className="w-2.5 h-2.5 rounded-full bg-violet-400 shadow-lg shadow-violet-400/20"></div>
+                      AI Prediction
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="font-medium">
+                    <div className="font-medium text-white">
                       {progress?.stage === 'initializing' && 'Initializing model...'}
                       {progress?.stage === 'training' && `Training model (${progress.currentEpoch}/${progress.totalEpochs})`}
                       {progress?.stage === 'predicting' && 'Generating predictions...'}
                       {!progress && 'Preparing analysis...'}
                     </div>
                     {progress?.stage === 'training' && progress.loss !== undefined && (
-                      <div className="flex items-center gap-2 text-sm font-mono bg-gray-800/40 px-3 py-1.5 rounded-lg border border-gray-700/30">
-                        <span className="text-gray-400">Loss</span>
-                        <span className="text-indigo-300 tabular-nums transition-all duration-300 ease-out">
-                          {progress.loss.toFixed(4)}
-                        </span>
+                      <div className="flex items-center gap-3 bg-slate-800 px-4 py-2.5 rounded-xl border border-slate-600 shadow-lg">
+                        <div className="flex flex-col">
+                          <span className="text-xs uppercase tracking-wider text-slate-300">Loss</span>
+                          <span className="font-mono text-lg text-white tabular-nums transition-all duration-1000">
+                            {smoothedLoss.toFixed(4)}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
-                  <div className="text-sm text-indigo-400/80 bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/20">
+                  <div className="text-sm bg-slate-800 px-4 py-2.5 rounded-xl border border-slate-600 text-white font-medium shadow-lg">
                     {useLightModel ? 'Optimized' : 'Standard'} • {performancePreset}
                   </div>
                 </div>
                 
                 {/* Progress bar with smooth animation */}
                 <div className="relative">
-                  <div className="overflow-hidden h-2 rounded-full bg-gray-800/50">
+                  <div className="overflow-hidden h-2.5 rounded-full bg-slate-800 border border-slate-700">
                     <div 
-                      className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all duration-300 ease-out"
+                      className="h-full bg-gradient-to-r from-blue-400 to-indigo-400 transition-all duration-300 ease-out relative"
                       style={{
                         width: `${getProgressPercentage()}%`,
                       }}
                     >
-                      <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.15)_50%,transparent_100%)] animate-shine"></div>
+                      <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.3)_50%,transparent_100%)] animate-shine"></div>
                     </div>
                   </div>
                 </div>
