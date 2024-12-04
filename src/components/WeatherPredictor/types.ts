@@ -38,8 +38,8 @@ export interface ModelConfig {
   callbacks?: {
     onProgress?: (progress: TrainingProgress) => void;
     onModelUpdate?: (model: any) => void;
-    onTrainingLoss?: (loss: number[]) => void;
-    onValidationLoss?: (loss: number[]) => void;
+    onTrainingLoss?: (losses: number[]) => void;
+    onValidationLoss?: (losses: number[]) => void;
   };
 }
 
@@ -58,6 +58,8 @@ export interface ModelMetricsType {
   trainingLoss: number[];
   validationLoss: number[];
   errorDistribution: number[];
+  actuals: number[];
+  predictions: number[];
 }
 
 export interface TrainingStatus {

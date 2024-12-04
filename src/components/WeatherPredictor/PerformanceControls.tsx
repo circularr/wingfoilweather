@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { PerformancePreset } from './types';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
 
 interface PerformanceControlsProps {
   performancePreset: PerformancePreset;
@@ -9,205 +8,117 @@ interface PerformanceControlsProps {
   onModelTypeChange: (useLightModel: boolean) => void;
 }
 
-// Actual model configuration based on implementation
-const modelArchitecture = {
-  baseModel: {
-    name: "OpenMeteo GFS",
-    version: "Current",
-    details: [
-      { label: "Input Features", value: "Temperature, Wind Speed & Direction, Wave Height & Period" },
-      { label: "Update Frequency", value: "Hourly" },
-      { label: "Forecast Range", value: "24 hours" },
-      { label: "Data Source", value: "OpenMeteo API" }
-    ]
-  },
-  aiModel: {
-    name: "Neural Network",
-    version: "LSTM Architecture",
-    details: [
-      { 
-        label: "Model Architecture", 
-        value: (useLightModel: boolean) => useLightModel 
-          ? "32 LSTM units → 64 Dense → Output" 
-          : "64 LSTM units → 128 Dense → 64 Dense → Output" 
-      },
-      { label: "Input Features", value: "9 weather parameters" },
-      { label: "Sequence Length", value: (useLightModel: boolean, performancePreset: PerformancePreset) => 
-        performancePreset === 'fast' ? "8 hours" : 
-        performancePreset === 'accurate' ? "24 hours" : 
-        "16 hours"
-      },
-      { label: "Prediction Window", value: "24 hours ahead" }
-    ]
-  },
-  performanceModes: {
-    name: "Training Configuration",
-    version: "Current",
-    details: [
-      { label: "Fast Mode", value: "20 epochs, batch size 64" },
-      { label: "Balanced Mode", value: "50 epochs, batch size 32" },
-      { label: "Accurate Mode", value: "100 epochs, batch size 16" }
-    ]
-  }
-};
-
 export function PerformanceControls({
   performancePreset,
   useLightModel,
   onPresetChange,
-  onModelTypeChange,
+  onModelTypeChange
 }: PerformanceControlsProps) {
-  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
-
   return (
-    <div className="space-y-8">
-      {/* Main Settings */}
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-medium text-white">Model Configuration</h3>
-          <p className="text-sm text-gray-400 mt-1">
-            Customize the AI model's behavior to balance between speed and accuracy
-          </p>
-        </div>
-
-        <div className="grid gap-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm text-gray-300">
-                Performance Mode
-                <span className="block text-xs text-gray-400 mt-1">Balance between speed and accuracy</span>
-              </label>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {(['fast', 'balanced', 'accurate'] as const).map((preset) => (
-                <button
-                  key={preset}
-                  onClick={() => onPresetChange(preset)}
-                  className={`
-                    relative px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
-                    ${performancePreset === preset
-                      ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/50'
-                      : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 hover:text-white'}
-                    flex flex-col items-center gap-2
-                  `}
-                >
-                  <span className="capitalize">{preset}</span>
-                  <span className="text-xs opacity-75">
-                    {preset === 'fast' ? '20 epochs' : preset === 'balanced' ? '50 epochs' : '100 epochs'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm text-gray-300">
-                Model Architecture
-                <span className="block text-xs text-gray-400 mt-1">Choose between speed and complexity</span>
-              </label>
-            </div>
-            <div className="relative">
-              <input
-                type="checkbox"
-                id="lightModel"
-                checked={useLightModel}
-                onChange={(e) => onModelTypeChange(e.target.checked)}
-                className="peer sr-only"
-              />
-              <label
-                htmlFor="lightModel"
-                className={`
-                  flex items-center justify-between w-full px-5 py-4 rounded-xl cursor-pointer
-                  transition-all duration-200 ring-1
-                  ${useLightModel
-                    ? 'bg-indigo-500/20 text-indigo-300 ring-indigo-500/50'
-                    : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 hover:text-white ring-gray-700/50'}
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <svg 
-                    className={`w-5 h-5 ${useLightModel ? 'text-indigo-300' : 'text-gray-400'}`}
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
-                  >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={1.5} 
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
-                  </svg>
-                  <div>
-                    <span className="text-sm font-medium">Light Model</span>
-                    <span className="block text-xs opacity-75 mt-0.5">
-                      {useLightModel ? '32 LSTM units' : '64 LSTM units'}
-                    </span>
-                  </div>
-                </div>
-                <div className="w-11 h-6 bg-gray-700/50 rounded-full relative">
-                  <div className={`
-                    absolute left-1 top-1 w-4 h-4 rounded-full transition-all duration-200
-                    ${useLightModel ? 'bg-indigo-300 translate-x-5' : 'bg-gray-400 translate-x-0'}
-                  `}/>
-                </div>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs text-gray-400 mt-6 bg-gray-800/30 rounded-lg p-3">
-          <InformationCircleIcon className="w-4 h-4 flex-shrink-0" />
-          <span>Current configuration: {useLightModel ? 'Light' : 'Full'} model ({useLightModel ? '32' : '64'} LSTM units) with {
-            performancePreset === 'fast' ? '20' : 
-            performancePreset === 'balanced' ? '50' : 
-            '100'
-          } training epochs</span>
-        </div>
-
-        {/* Technical Details Toggle */}
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
         <button
-          onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-          className={`
-            w-full px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
-            ${showTechnicalDetails
-              ? 'bg-indigo-500/20 text-indigo-300 ring-1 ring-indigo-500/50'
-              : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 hover:text-white'}
-            flex items-center justify-center gap-2
-          `}
+          onClick={() => onPresetChange('fast')}
+          className={`flex flex-col items-start p-4 rounded-xl border transition-all duration-200 ${
+            performancePreset === 'fast'
+              ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-100'
+              : 'bg-gray-800/50 border-gray-700/50 text-gray-300 hover:bg-gray-800 hover:border-gray-600'
+          }`}
         >
-          <span>{showTechnicalDetails ? 'Hide Technical Details' : 'Show Technical Details'}</span>
+          <div className="flex items-center gap-3 mb-2">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+            <span className="font-medium">Fast</span>
+          </div>
+          <p className="text-sm opacity-80">
+            Quick results for initial exploration. Lower accuracy but faster training.
+          </p>
+        </button>
+
+        <button
+          onClick={() => onPresetChange('balanced')}
+          className={`flex flex-col items-start p-4 rounded-xl border transition-all duration-200 ${
+            performancePreset === 'balanced'
+              ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-100'
+              : 'bg-gray-800/50 border-gray-700/50 text-gray-300 hover:bg-gray-800 hover:border-gray-600'
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"
+              />
+            </svg>
+            <span className="font-medium">Balanced</span>
+          </div>
+          <p className="text-sm opacity-80">
+            Good balance between speed and accuracy. Recommended for most use cases.
+          </p>
+        </button>
+
+        <button
+          onClick={() => onPresetChange('accurate')}
+          className={`flex flex-col items-start p-4 rounded-xl border transition-all duration-200 ${
+            performancePreset === 'accurate'
+              ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-100'
+              : 'bg-gray-800/50 border-gray-700/50 text-gray-300 hover:bg-gray-800 hover:border-gray-600'
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span className="font-medium">Accurate</span>
+          </div>
+          <p className="text-sm opacity-80">
+            Highest accuracy but slower training. Best for detailed analysis.
+          </p>
         </button>
       </div>
 
-      {/* Technical Details Panel */}
-      {showTechnicalDetails && (
-        <div className="space-y-4 animate-fadeIn">
-          <div className="grid gap-4">
-            {Object.entries(modelArchitecture).map(([key, section]) => (
-              <div key={key} className="bg-gray-800/30 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <h5 className="text-sm font-medium text-white">{section.name}</h5>
-                  <span className="text-xs text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-md">
-                    {section.version}
-                  </span>
-                </div>
-                <div className="grid gap-2">
-                  {section.details.map((detail, idx) => (
-                    <div key={idx} className="flex justify-between text-sm">
-                      <span className="text-gray-400">{detail.label}</span>
-                      <span className="text-white/90">
-                        {typeof detail.value === 'function' ? detail.value(useLightModel, performancePreset) : detail.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="flex items-center gap-4">
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={useLightModel}
+            onChange={(e) => onModelTypeChange(e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+        </label>
+        <span className="text-sm text-gray-300">
+          Use lightweight model (faster but less accurate)
+        </span>
+      </div>
     </div>
   );
 }

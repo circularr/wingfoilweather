@@ -1,0 +1,58 @@
+/* src/components/Map/styles.css */
+
+.map-tiles {
+    filter: brightness(0.85) contrast(1.1);
+  }
+  
+  .leaflet-container {
+    background: #1a1b1e;
+  }
+  
+  .leaflet-control-zoom a,
+  .leaflet-control-geocoder-form input {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+  }
+  
+  .leaflet-control-zoom a:hover,
+  .leaflet-control-geocoder-form input:focus {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+  }
+  
+  .leaflet-control-geocoder {
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  .leaflet-control-geocoder-form input {
+    width: 200px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    outline: none;
+  }
+  
+  .leaflet-control-geocoder-alternatives {
+    background: #1a1b1e !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 4px;
+    margin-top: 5px;
+  }
+  
+  .leaflet-control-geocoder-alternatives a {
+    color: white !important;
+    padding: 5px 10px;
+  }
+  
+  .leaflet-control-geocoder-alternatives a:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  
+  .custom-marker {
+    filter: drop-shadow(0 0 10px rgba(79, 70, 229, 0.3));
+  }
+  
+  .custom-marker svg {
+    overflow: visible;
+  }
+  

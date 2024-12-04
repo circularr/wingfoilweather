@@ -1,12 +1,15 @@
+// src/components/Map/index.tsx
+
 import React, { useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-control-geocoder';
 import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
+import './styles.css'; // Import the new CSS file
 
 interface MapProps {
   onLocationSelect: (lat: number, lon: number) => void;
-  selectedLocation?: { lat: number; lon: number; } | null;
+  selectedLocation?: { lat: number; lon: number } | null;
 }
 
 export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocation }) => {
@@ -26,21 +29,25 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
       bounceAtZoomLimits: false,
       zoomControl: false
     });
-    
+
     mapRef.current = map;
 
     // Use Carto Dark Matter style (completely free, no API key needed)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+        '&copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19,
       className: 'map-tiles'
     }).addTo(map);
 
     // Add zoom control to top-right
-    L.control.zoom({
-      position: 'topright'
-    }).addTo(map);
+    L.control
+      .zoom({
+        position: 'topright'
+      })
+      .addTo(map);
 
     // Add search control (Nominatim - free OpenStreetMap search)
     const geocoder = (L.Control as any).geocoder({
@@ -50,7 +57,7 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
       geocoder: new (L.Control as any).Geocoder.Nominatim()
     }).addTo(map);
 
-    geocoder.on('markgeocode', function(e: any) {
+    geocoder.on('markgeocode', function (e: any) {
       const { center } = e.geocode;
       onLocationSelect(center.lat, center.lng);
     });
@@ -59,7 +66,7 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
     const southWest = L.latLng(49.8, -6.5);
     const northEast = L.latLng(51.2, -3.0);
     const bounds = L.latLngBounds(southWest, northEast);
-    
+
     map.setMaxBounds(bounds);
     map.fitBounds(bounds, {
       animate: false,
@@ -120,56 +127,8 @@ export const Map: React.FC<MapProps> = memo(({ onLocationSelect, selectedLocatio
 
   return (
     <div className="relative">
-      <style jsx global>{`
-        .map-tiles {
-          filter: brightness(0.85) contrast(1.1);
-        }
-        .leaflet-container {
-          background: #1a1b1e;
-        }
-        .leaflet-control-zoom a,
-        .leaflet-control-geocoder-form input {
-          background-color: rgba(255, 255, 255, 0.1) !important;
-          border: 1px solid rgba(255, 255, 255, 0.2) !important;
-          color: white !important;
-        }
-        .leaflet-control-zoom a:hover,
-        .leaflet-control-geocoder-form input:focus {
-          background-color: rgba(255, 255, 255, 0.2) !important;
-        }
-        .leaflet-control-geocoder {
-          background: transparent !important;
-          border: none !important;
-        }
-        .leaflet-control-geocoder-form input {
-          width: 200px;
-          padding: 5px 10px;
-          border-radius: 4px;
-          outline: none;
-        }
-        .leaflet-control-geocoder-alternatives {
-          background: #1a1b1e !important;
-          border: 1px solid rgba(255, 255, 255, 0.2) !important;
-          border-radius: 4px;
-          margin-top: 5px;
-        }
-        .leaflet-control-geocoder-alternatives a {
-          color: white !important;
-          padding: 5px 10px;
-        }
-        .leaflet-control-geocoder-alternatives a:hover {
-          background-color: rgba(255, 255, 255, 0.1) !important;
-        }
-        .custom-marker {
-          filter: drop-shadow(0 0 10px rgba(79, 70, 229, 0.3));
-        }
-        .custom-marker svg {
-          overflow: visible;
-        }
-      `}</style>
-      
-      <div 
-        ref={containerRef} 
+      <div
+        ref={containerRef}
         className="w-full h-[600px] bg-gray-900 rounded-xl overflow-hidden shadow-lg"
       />
     </div>

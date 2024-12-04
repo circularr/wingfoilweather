@@ -1,3 +1,5 @@
+// src/components/Chart/index.tsx
+
 import React, { useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
@@ -5,44 +7,75 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
-  LineController
+  ChartType,
+  ChartData,
+  ChartOptions,
+  TooltipItem,
+  ScatterDataPoint,
+  TimeScale,
+  LineController,
+  BarController,
+  ScatterController,
+  ChartTypeRegistry
 } from 'chart.js';
+import 'chartjs-adapter-date-fns';
 
-// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  TimeScale,
   PointElement,
   LineElement,
-  LineController,
+  BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  LineController,
+  BarController,
+  ScatterController
 );
 
+type ChartDataPoint = {
+  timestamp: number;
+  historical?: number;
+  forecast?: number;
+  prediction?: number;
+  training?: number;
+  validation?: number;
+  value?: number;
+  actual?: number;
+  predicted?: number;
+};
+
 interface ChartProps {
-  data: Array<{
-    timestamp: number;
-    historical?: number;
-    forecast?: number;
-    prediction?: number;
-  }>;
+  data: ChartDataPoint[];
   yLabel: string;
   historicalLabel?: string;
-  forecastLabel: string;
-  predictionLabel: string;
+  forecastLabel?: string;
+  predictionLabel?: string;
   id: string;
+  isTimeSeries?: boolean;
+  isBarChart?: boolean;
 }
 
-export function Chart({ data, yLabel, historicalLabel, forecastLabel, predictionLabel, id }: ChartProps) {
+export function Chart({
+  data,
+  yLabel,
+  historicalLabel,
+  forecastLabel,
+  predictionLabel,
+  id,
+  isTimeSeries = true,
+  isBarChart = false
+}: ChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
 
   useEffect(() => {
-    // Cleanup previous chart instance
     if (chartRef.current) {
       chartRef.current.destroy();
       chartRef.current = null;
@@ -54,208 +87,269 @@ export function Chart({ data, yLabel, historicalLabel, forecastLabel, prediction
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     const formatTime = (timestamp: number) => {
-      return new Date(timestamp).toLocaleString('en-GB', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
+      if (isTimeSeries) {
+        return new Date(timestamp).toLocaleString('en-GB', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+      } else {
+        return timestamp.toString();
+      }
     };
 
-    // Transform undefined values to null for Chart.js
-    const historicalData = data.map(d => d.historical ?? null);
-    const forecastData = data.map(d => d.forecast ?? null);
-    const predictionData = data.map(d => d.prediction ?? null);
+    const datasets: ChartData<ChartType>['datasets'] = [];
 
-    const datasets = [];
-
-    // Add historical data if available
-    if (historicalData.some(d => d !== null)) {
+    if (data.some((d) => d.historical !== undefined)) {
       datasets.push({
+        type: 'line',
         label: historicalLabel ?? 'Historical Data',
-        data: historicalData,
-        borderColor: 'rgb(186 230 253)', // text-sky-200
+        data: data.map((d) => (d.historical !== undefined ? { x: d.timestamp, y: d.historical } : null)).filter(Boolean),
+        borderColor: 'rgb(186, 230, 253)',
         backgroundColor: 'rgba(186, 230, 253, 0.1)',
         borderWidth: 1.5,
-        pointRadius: 0,
+        pointRadius: 2,
         pointHoverRadius: 4,
         tension: 0.4,
         fill: false
       });
     }
 
-    // Add forecast data if available
-    if (forecastData.some(d => d !== null)) {
+    if (data.some((d) => d.forecast !== undefined)) {
       datasets.push({
+        type: 'line',
         label: forecastLabel,
-        data: forecastData,
-        borderColor: 'rgb(165 180 252)',  // text-indigo-300
+        data: data.map((d) => (d.forecast !== undefined ? { x: d.timestamp, y: d.forecast } : null)).filter(Boolean),
+        borderColor: 'rgb(165, 180, 252)',
         backgroundColor: 'rgba(165, 180, 252, 0.1)',
         borderWidth: 1.5,
-        pointRadius: 0,
+        pointRadius: 2,
         pointHoverRadius: 4,
         tension: 0.4,
         fill: false
       });
     }
 
-    // Add prediction data if available
-    if (predictionData.some(d => d !== null)) {
+    if (data.some((d) => d.prediction !== undefined)) {
       datasets.push({
+        type: 'line',
         label: predictionLabel,
-        data: predictionData,
-        borderColor: 'rgb(240 171 252)',  // text-fuchsia-300
+        data: data.map((d) => (d.prediction !== undefined ? { x: d.timestamp, y: d.prediction } : null)).filter(Boolean),
+        borderColor: 'rgb(240, 171, 252)',
         backgroundColor: 'rgba(240, 171, 252, 0.1)',
         borderWidth: 1.5,
-        pointRadius: 0,
+        pointRadius: 2,
         pointHoverRadius: 4,
         tension: 0.4,
         fill: false
       });
     }
 
-    // Create new chart instance
-    chartRef.current = new ChartJS(ctx, {
-      type: 'line',
-      data: {
-        labels: data.map(d => formatTime(d.timestamp)),
-        datasets: datasets
+    if (data.some((d) => d.training !== undefined)) {
+      datasets.push({
+        type: 'line',
+        label: historicalLabel ?? 'Training Loss',
+        data: data.map((d) => (d.training !== undefined ? { x: d.timestamp, y: d.training } : null)).filter(Boolean),
+        borderColor: 'rgb(129, 140, 248)',
+        backgroundColor: 'rgba(129, 140, 248, 0.1)',
+        borderWidth: 1.5,
+        pointRadius: 3,
+        pointHoverRadius: 4,
+        tension: 0.0,
+        fill: false
+      });
+    }
+
+    if (data.some((d) => d.validation !== undefined)) {
+      datasets.push({
+        type: 'line',
+        label: forecastLabel ?? 'Validation Loss',
+        data: data.map((d) => (d.validation !== undefined ? { x: d.timestamp, y: d.validation } : null)).filter(Boolean),
+        borderColor: 'rgb(99, 102, 241)',
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        borderWidth: 1.5,
+        pointRadius: 3,
+        pointHoverRadius: 4,
+        tension: 0.0,
+        fill: false
+      });
+    }
+
+    if (data.some((d) => d.value !== undefined)) {
+      datasets.push({
+        type: 'bar',
+        label: historicalLabel ?? 'Data',
+        data: data.map((d) => (d.value !== undefined ? { x: d.timestamp, y: d.value } : null)).filter(Boolean),
+        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+        borderWidth: 0
+      });
+    }
+
+    if (data.some((d) => d.actual !== undefined && d.predicted !== undefined)) {
+      datasets.push({
+        type: 'scatter',
+        label: 'Predicted vs Actual',
+        data: data
+          .filter((d) => d.actual !== undefined && d.predicted !== undefined)
+          .map((d) => ({ x: d.actual!, y: d.predicted! })),
+        borderColor: 'rgb(129, 140, 248)',
+        backgroundColor: 'rgba(129, 140, 248, 0.5)',
+        pointRadius: 3,
+        pointHoverRadius: 5
+      });
+    }
+
+    const options: ChartOptions<ChartType> = {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'nearest',
+        axis: 'x',
+        intersect: false
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          mode: 'nearest',
-          axis: 'x',
-          intersect: false
-        },
-        plugins: {
-          legend: {
-            position: 'top',
-            align: 'start',
-            labels: {
-              boxWidth: 12,
-              boxHeight: 12,
-              padding: 15,
-              font: {
-                family: "'Inter', system-ui, sans-serif",
-                size: 12,
-                weight: '500'
-              },
-              color: 'rgb(226, 232, 240)' // slate-200
-            }
-          },
-          tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            titleFont: {
+      plugins: {
+        legend: {
+          position: 'top',
+          align: 'start',
+          labels: {
+            boxWidth: 12,
+            boxHeight: 12,
+            padding: 15,
+            font: {
               family: "'Inter', system-ui, sans-serif",
               size: 12,
-              weight: '600'
+              weight: 500
             },
-            bodyFont: {
+            color: 'rgb(226, 232, 240)'
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          titleFont: {
+            family: "'Inter', system-ui, sans-serif",
+            size: 12,
+            weight: 'bold'
+          },
+          bodyFont: {
+            family: "'Inter', system-ui, sans-serif",
+            size: 12,
+            weight: 'normal'
+          },
+          padding: 12,
+          cornerRadius: 8,
+          boxPadding: 4,
+          borderColor: 'rgba(51, 65, 85, 0.5)',
+          borderWidth: 1,
+          displayColors: false,
+          callbacks: {
+            title: (tooltipItems: TooltipItem<ChartType>[]) => {
+              if (isTimeSeries) {
+                return new Date(tooltipItems[0].parsed.x).toLocaleString('en-GB', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                });
+              }
+              return tooltipItems[0].parsed.x.toString();
+            },
+            label: (context: TooltipItem<ChartType>) => {
+              const value = context.parsed.y;
+              if (value === null) return '';
+              return `${context.dataset.label}: ${value.toFixed(2)} ${yLabel.replace('(', '').replace(')', '')}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: isTimeSeries ? 'time' : 'linear',
+          grid: {
+            display: true,
+            color: 'rgba(51, 65, 85, 0.1)',
+            tickLength: 0
+          },
+          ticks: {
+            maxRotation: 0,
+            font: {
+              family: "'Inter', system-ui, sans-serif",
+              size: 11
+            },
+            color: 'rgb(148, 163, 184)',
+            maxTicksLimit: 8
+          },
+          border: {
+            color: 'rgba(51, 65, 85, 0.2)'
+          }
+        },
+        y: {
+          grid: {
+            display: true,
+            color: 'rgba(51, 65, 85, 0.1)',
+            tickLength: 0
+          },
+          border: {
+            color: 'rgba(51, 65, 85, 0.2)'
+          },
+          ticks: {
+            font: {
+              family: "'Inter', system-ui, sans-serif",
+              size: 11
+            },
+            color: 'rgb(148, 163, 184)',
+            padding: 8,
+            maxTicksLimit: 6
+          },
+          title: {
+            display: true,
+            text: yLabel,
+            font: {
               family: "'Inter', system-ui, sans-serif",
               size: 12,
-              weight: '400'
+              weight: 500
             },
-            padding: 12,
-            cornerRadius: 8,
-            boxPadding: 4,
-            borderColor: 'rgba(51, 65, 85, 0.5)',
-            borderWidth: 1,
-            displayColors: false,
-            callbacks: {
-              title: (tooltipItems) => {
-                return tooltipItems[0].label;
-              },
-              label: (context) => {
-                const value = context.parsed.y;
-                if (value === null) return '';
-                return `${context.dataset.label}: ${value.toFixed(1)} ${yLabel.replace('(', '').replace(')', '')}`;
-              }
+            color: 'rgb(148, 163, 184)',
+            padding: {
+              bottom: 8
             }
-          }
-        },
-        scales: {
-          x: {
-            grid: {
-              display: true,
-              color: 'rgba(51, 65, 85, 0.1)',
-              tickLength: 0
-            },
-            ticks: {
-              maxRotation: 0,
-              font: {
-                family: "'Inter', system-ui, sans-serif",
-                size: 11
-              },
-              color: 'rgb(148, 163, 184)', // slate-400
-              maxTicksLimit: 8,
-              callback: function(value, index, values) {
-                const label = this.getLabelForValue(value as number);
-                return label.split(',')[0]; // Show only date, not time
-              }
-            },
-            border: {
-              color: 'rgba(51, 65, 85, 0.2)'
-            }
-          },
-          y: {
-            grid: {
-              display: true,
-              color: 'rgba(51, 65, 85, 0.1)',
-              tickLength: 0
-            },
-            border: {
-              color: 'rgba(51, 65, 85, 0.2)'
-            },
-            ticks: {
-              font: {
-                family: "'Inter', system-ui, sans-serif",
-                size: 11
-              },
-              color: 'rgb(148, 163, 184)', // slate-400
-              padding: 8,
-              maxTicksLimit: 6
-            },
-            title: {
-              display: true,
-              text: yLabel,
-              font: {
-                family: "'Inter', system-ui, sans-serif",
-                size: 12,
-                weight: '500'
-              },
-              color: 'rgb(148, 163, 184)', // slate-400
-              padding: {
-                bottom: 8
-              }
-            }
-          }
-        },
-        layout: {
-          padding: {
-            top: 8,
-            right: 8,
-            bottom: 8,
-            left: 8
           }
         }
       }
-    });
+    };
 
-    // Cleanup function
+    const config = {
+      type: isBarChart ? 'bar' : 'line',
+      data: { datasets },
+      options
+    };
+
+    chartRef.current = new ChartJS(ctx, config);
+
     return () => {
       if (chartRef.current) {
         chartRef.current.destroy();
         chartRef.current = null;
       }
     };
-  }, [data, yLabel, historicalLabel, forecastLabel, predictionLabel, id]);
+  }, [
+    data,
+    yLabel,
+    historicalLabel,
+    forecastLabel,
+    predictionLabel,
+    id,
+    isTimeSeries,
+    isBarChart
+  ]);
 
   return (
-    <div style={{ height: '300px', width: '100%' }}>
+    <div style={{ height: '100%', width: '100%', position: 'relative' }}>
       <canvas ref={canvasRef} id={id}></canvas>
     </div>
   );
