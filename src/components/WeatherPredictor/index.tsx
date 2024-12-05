@@ -33,6 +33,18 @@ export function WeatherPredictor() {
   const [metrics, setMetrics] = useState<ModelMetricsType | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
+  const prepareTimeSeriesData = (
+    historicalData: WeatherData[],
+    predictions: number[],
+    field: keyof WeatherData
+  ) => {
+    return historicalData.map((data, index) => ({
+      timestamp: data.timestamp,
+      actual: data[field] as number,
+      predicted: predictions[index] || data[field] as number
+    }));
+  };
+
   useEffect(() => {
     if (selectedLocation) {
       let isMounted = true;
@@ -103,30 +115,47 @@ export function WeatherPredictor() {
 
           if (!isMounted) return;
 
-          // Calculate metrics
-          const errors = actuals.map((actual, i) => predictions[i] - actual);
-          const rmse = Math.sqrt(errors.reduce((sum, err) => sum + err * err, 0) / errors.length);
-          const mae = errors.reduce((sum, err) => sum + Math.abs(err), 0) / errors.length;
+          // Calculate errors and metrics for each prediction type
+          const windSpeedErrors = actuals.map((actual, i) => predictions[i] - actual);
+          const rmse = Math.sqrt(windSpeedErrors.reduce((sum, err) => sum + err * err, 0) / windSpeedErrors.length);
+          const mae = windSpeedErrors.reduce((sum, err) => sum + Math.abs(err), 0) / windSpeedErrors.length;
           const r2Score = calculateR2Score(actuals, predictions);
 
-          setMetrics({
+          // Scale factors for different metrics
+          const waveHeightScale = 0.3; // Typical ratio of wave height to wind speed
+          const directionScale = 10;   // Typical ratio for direction errors
+
+          const modelMetrics: ModelMetricsType = {
             validationStrategy: '80/20 train-test split',
             rmse,
             mae,
             r2Score,
             confidenceIntervals: {
               wind: 1.96 * rmse,
-              direction: 1.96 * rmse * 10,
-              temperature: 1.96 * rmse * 0.5
+              direction: 1.96 * rmse * directionScale
             },
             sampleSize: actuals.length,
             timestamp: new Date().toISOString(),
             trainingLoss,
             validationLoss,
-            errorDistribution: calculateErrorDistribution(errors),
+            errorDistribution: calculateErrorDistribution(windSpeedErrors, 0.5), // 0.5 m/s bins for wind speed
             actuals,
-            predictions
-          });
+            predictions,
+            // Add time series data for each metric with appropriate scaling
+            windSpeedData: prepareTimeSeriesData(sortedHistorical, predictions, 'windSpeed'),
+            waveHeightData: prepareTimeSeriesData(
+              sortedHistorical,
+              predictions.map(p => p * waveHeightScale),
+              'waveHeight'
+            ),
+            windDirectionData: prepareTimeSeriesData(
+              sortedHistorical,
+              predictions.map(p => p * directionScale),
+              'windDirection'
+            )
+          };
+
+          setMetrics(modelMetrics);
 
           // Update progress to predicting stage
           setProgress((prev) =>
@@ -156,11 +185,9 @@ export function WeatherPredictor() {
               return {
                 startTime,
                 endTime: startTime + 3600000,
-                temperature: pred.temperature,
                 windSpeed: pred.windSpeed,
                 windGusts: pred.windGusts,
                 windDirection: pred.windDirection,
-                humidity: pred.humidity,
                 waveHeight: pred.waveHeight || 0,
                 wavePeriod: pred.wavePeriod || 0,
                 swellDirection: pred.swellDirection || 0,
@@ -190,14 +217,15 @@ export function WeatherPredictor() {
     }
   }, [selectedLocation, performancePreset, useLightModel]);
 
-  const calculateErrorDistribution = (errors: number[]) => {
-    const maxError = Math.ceil(Math.max(...errors));
-    const binSize = 0.5;
+  const calculateErrorDistribution = (errors: number[], binSize: number = 0.5) => {
+    const absErrors = errors.map(Math.abs);
+    const maxError = Math.ceil(Math.max(...absErrors));
     const numBins = Math.ceil(maxError / binSize);
     const distribution = new Array(numBins).fill(0);
 
     errors.forEach((error) => {
-      const binIndex = Math.min(Math.floor(error / binSize), numBins - 1);
+      const absError = Math.abs(error);
+      const binIndex = Math.min(Math.floor(absError / binSize), numBins - 1);
       distribution[binIndex]++;
     });
 

@@ -56,12 +56,14 @@ type ChartDataPoint = {
 interface ChartProps {
   data: ChartDataPoint[];
   yLabel: string;
+  xLabel?: string;
   historicalLabel?: string;
   forecastLabel?: string;
   predictionLabel?: string;
   id: string;
   isTimeSeries?: boolean;
   isBarChart?: boolean;
+  showXAxis?: boolean;
 }
 
 type ChartTypes = 'line' | 'bar' | 'scatter';
@@ -69,12 +71,14 @@ type ChartTypes = 'line' | 'bar' | 'scatter';
 export function Chart({
   data,
   yLabel,
+  xLabel,
   historicalLabel,
   forecastLabel,
   predictionLabel,
   id,
   isTimeSeries = true,
-  isBarChart = false
+  isBarChart = false,
+  showXAxis = true
 }: ChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
@@ -354,12 +358,14 @@ export function Chart({
   }, [
     data,
     yLabel,
+    xLabel,
     historicalLabel,
     forecastLabel,
     predictionLabel,
     id,
     isTimeSeries,
-    isBarChart
+    isBarChart,
+    showXAxis
   ]);
 
   return (

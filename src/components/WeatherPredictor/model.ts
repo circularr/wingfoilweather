@@ -290,7 +290,7 @@ export async function predictNextHours(
   // Prepare initial input data
   const normalizedData = normalizeData(historicalData.slice(-timeSteps), stats);
   const predictions: WeatherData[] = [];
-
+  
   let currentInput = normalizedData;
 
   // Generate predictions for each hour
@@ -309,6 +309,10 @@ export async function predictNextHours(
     const inputTensor = tf.tensor3d([inputSequence]);
     const predictionTensor = model.predict(inputTensor) as tf.Tensor;
     const predictionArray = await predictionTensor.array();
+
+    if (!Array.isArray(predictionArray) || !Array.isArray(predictionArray[0])) {
+      throw new Error('Invalid prediction format');
+    }
 
     // Denormalize prediction
     const prediction = denormalizePrediction(predictionArray[0], stats);

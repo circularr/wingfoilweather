@@ -33,10 +33,22 @@ export interface ModelConfig {
   useLightModel: boolean;
   callbacks?: {
     onProgress?: (progress: TrainingProgress) => void;
-    onModelUpdate?: (model: any) => void;
-    onTrainingLoss?: (losses: number[]) => void;
-    onValidationLoss?: (losses: number[]) => void;
   };
+}
+
+export interface TrainingProgress {
+  currentEpoch: number;
+  totalEpochs: number;
+  loss: number;
+  stage: 'initializing' | 'training' | 'predicting';
+  status?: string;
+  progress?: number;
+}
+
+export interface TimeSeriesDataPoint {
+  timestamp: number;
+  actual: number;
+  predicted: number;
 }
 
 export interface ModelMetricsType {
@@ -55,19 +67,7 @@ export interface ModelMetricsType {
   errorDistribution: number[];
   actuals: number[];
   predictions: number[];
-}
-
-export interface TrainingStatus {
-  epoch: number;
-  loss: number;
-  status: 'training' | 'complete' | 'error';
-}
-
-export interface TrainingProgress {
-  currentEpoch: number;
-  totalEpochs: number;
-  loss: number;
-  stage: 'initializing' | 'training' | 'predicting';
-  status?: string;
-  progress?: number;
+  windSpeedData: TimeSeriesDataPoint[];
+  waveHeightData: TimeSeriesDataPoint[];
+  windDirectionData: TimeSeriesDataPoint[];
 }
