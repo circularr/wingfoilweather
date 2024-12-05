@@ -1,5 +1,6 @@
 import React from 'react';
 import { WeatherPredictor } from './components/WeatherPredictor';
+import { Analytics } from '@vercel/analytics/react';
 import 'leaflet/dist/leaflet.css';
 
 function App() {
@@ -8,6 +9,7 @@ function App() {
       <main>
         <WeatherPredictor />
       </main>
+      <Analytics />
     </div>
   );
 }
