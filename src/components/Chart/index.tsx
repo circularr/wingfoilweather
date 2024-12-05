@@ -20,7 +20,8 @@ import {
   ChartTypeRegistry,
   ScatterController,
   LineController,
-  BarController
+  BarController,
+  LegendItem
 } from 'chart.js';
 import type { DeepPartial } from 'chart.js/types/utils';
 import { enGB } from 'date-fns/locale';
@@ -49,8 +50,10 @@ type ChartDataPoint = {
   training?: number;
   validation?: number;
   value?: number;
-  actual?: number;
-  predicted?: number;
+  scatter?: number;
+  reference?: number;
+  regression?: number;
+  type?: 'scatter' | 'reference' | 'regression';
 };
 
 interface ChartProps {
@@ -196,20 +199,48 @@ export function Chart({
       });
     }
 
-    if (data.some((d) => d.actual !== undefined && d.predicted !== undefined)) {
+    if (data.some((d) => d.scatter !== undefined)) {
       datasets.push({
         type: 'scatter' as const,
-        label: 'Predicted vs Actual',
+        label: historicalLabel ?? 'Data Points',
         data: data
-          .filter(
-            (d): d is ChartDataPoint & { actual: number; predicted: number } =>
-              d.actual !== undefined && d.predicted !== undefined
-          )
-          .map((d) => ({ x: d.actual, y: d.predicted })),
+          .filter((d): d is ChartDataPoint & { scatter: number } => d.scatter !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.scatter })),
         borderColor: 'rgb(129, 140, 248)',
         backgroundColor: 'rgba(129, 140, 248, 0.5)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: 4,
+        pointHoverRadius: 6
+      });
+    }
+
+    if (data.some((d) => d.reference !== undefined)) {
+      datasets.push({
+        type: 'line' as const,
+        label: forecastLabel ?? 'Perfect Prediction',
+        data: data
+          .filter((d): d is ChartDataPoint & { reference: number } => d.reference !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.reference })),
+        borderColor: 'rgb(226, 232, 240)',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        tension: 0
+      });
+    }
+
+    if (data.some((d) => d.regression !== undefined)) {
+      datasets.push({
+        type: 'line' as const,
+        label: predictionLabel ?? 'Best Fit Line',
+        data: data
+          .filter((d): d is ChartDataPoint & { regression: number } => d.regression !== undefined)
+          .map((d) => ({ x: d.timestamp, y: d.regression })),
+        borderColor: 'rgb(244, 63, 94)',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0
       });
     }
 
@@ -220,6 +251,57 @@ export function Chart({
         mode: 'nearest',
         axis: 'x',
         intersect: false
+      },
+      scales: {
+        x: {
+          type: isTimeSeries ? 'time' : 'linear',
+          display: showXAxis,
+          title: {
+            display: !!xLabel,
+            text: xLabel,
+            color: 'rgb(226, 232, 240)',
+            font: {
+              size: 12,
+              weight: '500'
+            }
+          },
+          grid: {
+            color: 'rgba(148, 163, 184, 0.1)',
+            tickColor: 'rgba(148, 163, 184, 0.1)'
+          },
+          ticks: {
+            color: 'rgb(148, 163, 184)',
+            font: {
+              size: 11
+            }
+          },
+          adapters: {
+            date: {
+              locale: enGB
+            }
+          }
+        },
+        y: {
+          title: {
+            display: !!yLabel,
+            text: yLabel,
+            color: 'rgb(226, 232, 240)',
+            font: {
+              size: 12,
+              weight: '500'
+            }
+          },
+          grid: {
+            color: 'rgba(148, 163, 184, 0.1)',
+            tickColor: 'rgba(148, 163, 184, 0.1)'
+          },
+          ticks: {
+            color: 'rgb(148, 163, 184)',
+            font: {
+              size: 11
+            }
+          }
+        }
       },
       plugins: {
         legend: {
@@ -234,7 +316,11 @@ export function Chart({
               size: 12,
               weight: 500
             },
-            color: 'rgb(226, 232, 240)'
+            color: 'rgb(226, 232, 240)',
+            filter: (item: LegendItem) => {
+              const dataset = datasets[item.datasetIndex];
+              return dataset.data.length > 0;
+            }
           }
         },
         tooltip: {
@@ -251,86 +337,20 @@ export function Chart({
           },
           padding: 12,
           cornerRadius: 8,
-          boxPadding: 4,
-          borderColor: 'rgba(51, 65, 85, 0.5)',
-          borderWidth: 1,
-          displayColors: false,
+          displayColors: true,
           callbacks: {
-            title: (tooltipItems: TooltipItem<ChartTypes>[]) => {
+            title: (items: TooltipItem<ChartTypes>[]) => {
+              if (!items.length) return '';
+              const item = items[0];
               if (isTimeSeries) {
-                return new Date(tooltipItems[0].parsed.x).toLocaleString('en-GB', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false
-                });
+                return new Date(item.parsed.x).toLocaleString();
               }
-              return tooltipItems[0].parsed.x.toString();
+              return `${xLabel ?? 'Value'}: ${item.parsed.x.toFixed(2)}`;
             },
-            label: (context: TooltipItem<ChartTypes>) => {
-              const value = context.parsed.y;
-              if (value === null) return '';
-              return `${context.dataset.label}: ${value.toFixed(2)} ${yLabel.replace('(', '').replace(')', '')}`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          type: isTimeSeries ? 'time' : 'linear',
-          adapters: {
-            date: {
-              locale: enGB
-            }
-          },
-          grid: {
-            display: true,
-            color: 'rgba(51, 65, 85, 0.1)',
-            tickLength: 0
-          },
-          ticks: {
-            maxRotation: 0,
-            font: {
-              family: "'Inter', system-ui, sans-serif",
-              size: 11
-            },
-            color: 'rgb(148, 163, 184)',
-            maxTicksLimit: 8
-          },
-          border: {
-            color: 'rgba(51, 65, 85, 0.2)'
-          }
-        },
-        y: {
-          grid: {
-            display: true,
-            color: 'rgba(51, 65, 85, 0.1)',
-            tickLength: 0
-          },
-          border: {
-            color: 'rgba(51, 65, 85, 0.2)'
-          },
-          ticks: {
-            font: {
-              family: "'Inter', system-ui, sans-serif",
-              size: 11
-            },
-            color: 'rgb(148, 163, 184)',
-            padding: 8,
-            maxTicksLimit: 6
-          },
-          title: {
-            display: true,
-            text: yLabel,
-            font: {
-              family: "'Inter', system-ui, sans-serif",
-              size: 12,
-              weight: 500
-            },
-            color: 'rgb(148, 163, 184)',
-            padding: {
-              bottom: 8
+            label: (item: TooltipItem<ChartTypes>) => {
+              const dataset = item.dataset;
+              const value = item.parsed.y;
+              return `${dataset.label}: ${value.toFixed(2)}`;
             }
           }
         }

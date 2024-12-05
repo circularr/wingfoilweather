@@ -258,20 +258,23 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
           <div className="h-80">
             <Chart
               data={[
+                // Scatter points
                 ...scatterData.map(point => ({
                   timestamp: point.x,
-                  value: point.y,
-                  type: 'scatter'
+                  scatter: point.y,
+                  type: 'scatter' as const
                 })),
+                // Perfect prediction line (y=x)
                 ...referenceLine.map(point => ({
                   timestamp: point.x,
-                  value: point.y,
-                  type: 'reference'
+                  reference: point.y,
+                  type: 'reference' as const
                 })),
+                // Regression line
                 ...regressionLine.map(point => ({
                   timestamp: point.x,
-                  value: point.y,
-                  type: 'regression'
+                  regression: point.y,
+                  type: 'regression' as const
                 }))
               ]}
               yLabel="Predicted Values"
@@ -287,10 +290,11 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
           <ExpandableDescription title="Understanding the Prediction Accuracy Plot">
             <div className="space-y-2">
               <p><strong>What it shows:</strong> How well predicted values match actual values</p>
-              <p><strong>Lines:</strong></p>
+              <p><strong>Lines and Points:</strong></p>
               <ul className="list-disc list-inside ml-2">
-                <li>Diagonal line (y=x): Perfect predictions</li>
-                <li>Best fit line: Actual trend of predictions</li>
+                <li>Blue dots: Individual predictions</li>
+                <li>Dashed line: Perfect predictions (y=x)</li>
+                <li>Solid line: Best fit trend</li>
               </ul>
               <p><strong>Interpretation:</strong></p>
               <ul className="list-disc list-inside ml-2">
@@ -299,10 +303,12 @@ export function ModelMetrics({ metrics }: ModelMetricsProps) {
                 <li>Scattered points: High prediction variance</li>
                 <li>Tight clustering: Consistent predictions</li>
               </ul>
-              <p><strong>Current bias:</strong> {regression ? 
-                `Model tends to ${regression.slope > 1 ? 'overpredict' : 'underpredict'} 
-                 by approximately ${Math.abs((regression.slope - 1) * 100).toFixed(1)}%` : 
-                'Insufficient data for bias analysis'}</p>
+              {regression && (
+                <p><strong>Current bias:</strong> Model tends to {regression.slope > 1 ? 'overpredict' : 'underpredict'} 
+                  by approximately {Math.abs((regression.slope - 1) * 100).toFixed(1)}%
+                  {regression.intercept !== 0 && ` with a base offset of ${Math.abs(regression.intercept).toFixed(2)}`}
+                </p>
+              )}
             </div>
           </ExpandableDescription>
         </div>
